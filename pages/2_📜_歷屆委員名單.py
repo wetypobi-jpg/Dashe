@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 from supabase import create_client
 
@@ -13,20 +14,81 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("📜 吾映良品柒 - 歷屆委員名單總覽")
-st.write("依據社區歷史紀錄整理之歷屆委員與任期對照表：")
+st.title("📜 吾映良品柒 - 歷屆委員服務統計與名單")
+st.write(
+    "在這裡您可以查詢各戶歷年來擔任委員的**總服務次數與職稱統計**，以及詳細的歷史任期紀錄。"
+)
+st.markdown("---")
 
 all_committees = supabase.table("committees").select("*").execute().data
 
 if all_committees:
-  table_data = []
-  for c in all_committees:
-    table_data.append({
-        "任期/年份": c["year"],
-        "職稱": c["role"],
-        "戶號": c["unit_code"],
-        "備註": "現任委員" if c["is_current"] else "歷史紀錄",
-    })
-  st.dataframe(table_data, use_container_width=True)
+  # 1. 計算統計次數
+  # 我們將資料轉換成 DataFrame 來做統計分析
+  df = pd.DataFrame(all_committees)
+
+  # 統計每一戶在各個職稱上擔任了幾次
+  pivot_table = (
+      df.pivot_table(
+          index="unit_code",
+          columns="role",
+          values="id",
+          aggfunc="count",
+          fill_value=0,
+      )
+      .reset_index()
+  )
+
+  # 確保 主任委員、財務委員、監察委員 欄位都存在
+  for r in ["主任委員", "財務委員", "監察委員"]:
+    if r not in pivot_table.columns:
+      pivot_table[r] = 0
+
+  # 計算總服務次數
+  pivot_table["總服務次數"] = (
+      pivot_table["主任委員"]
+      + pivot_table["財務委員"]
+      + pivot_table["監察委員"]
+  )
+
+  # 重新排序欄位
+  cols_order = [
+      "unit_code",
+      "總服務次數",
+      "主任委員",
+      "財務委員",
+      "監察委員",
+  ]
+  pivot_table = pivot_table[[c for c in cols_order if c in pivot_table.columns]]
+  pivot_table = pivot_table.sort_values(
+      by="總服務次數", ascending=False
+  ).reset_index(drop=True)
+
+  # 重新命名欄位以便長輩閱讀
+  pivot_table.columns = [
+      "戶號",
+      "總服務次數",
+      "擔任主委次數",
+      "擔任財委次數",
+      "擔任監委次數",
+  ]
+
+  st.subheader("📊 各戶委員服務次數統計總表")
+  st.write("查詢各戶歷年來為社區服務的總次數與各職稱分布：")
+  st.dataframe(pivot_table, use_container_width=True)
+
+  st.markdown("---")
+
+  # 2. 歷屆詳細清單 (使用 expander，預設關閉 expanded=False)
+  with st.expander("🔍 點擊展開：查看歷屆詳細任期與名單清單", expanded=False):
+    table_data = []
+    for c in all_committees:
+      table_data.append({
+          "任期/年份": c["year"],
+          "職稱": c["role"],
+          "戶號": c["unit_code"],
+          "備註": "現任委員" if c.get("is_current") else "歷史紀錄",
+      })
+    st.dataframe(table_data, use_container_width=True)
 else:
   st.info("目前尚無委員資料。")
