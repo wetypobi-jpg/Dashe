@@ -23,7 +23,7 @@ if all_fees_raw:
   available_years = sorted(list(set([str(f["year"]) for f in all_fees_raw])))
   selected_year = st.selectbox("選擇查詢年度", available_years)
 else:
-  selected_year = "115"
+  selected_year = "2026"
 
 st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
@@ -37,7 +37,6 @@ committees_data = supabase.table("committees").select("*").execute().data
 is_current_treasurer = False
 default_treasurer_signer = st.session_state.user_code  # 預設備援
 
-# 1. 先從 units 檢查該使用者是否具備管理員或財委身分
 current_user_unit = None
 if units_data:
   for u in units_data:
@@ -45,46 +44,79 @@ if units_data:
       current_user_unit = u
       break
 
-# 2. 自動尋找當年度的財委並組合格式 "戶號(任期-職稱)"
 if committees_data:
   for c in committees_data:
     year_str = str(c.get("year", ""))
     if current_year_str in year_str and c.get("role") == "財務委員":
       t_unit = c.get("unit_code", "")
-      t_name = c.get("name", "")
-      # 組合格式：戶號(任期-財委) 或 戶號(姓名-財委)
       default_treasurer_signer = f"{t_unit}({year_str}-財委)"
       break
 
-# 如果 units 裡面直接記錄了 role == '財委' 也可以做雙重對照
 if current_user_unit and current_user_unit.get("role") == "財委":
   is_current_treasurer = True
 
 has_management_rights = (
     (current_user_unit and current_user_unit.get("is_admin"))
-    or (current_user_unit and current_user_unit.get("role") in ["主委", "財委"])
+    or (current_user_unit and current_user_unit.get("role") == "財委")
     or is_current_treasurer
 )
 
+
+# 輔助函式：將原始資料轉為乾淨、中文表頭且無 ID 的 DataFrame
+def format_fee_dataframe(fees_list):
+  if not fees_list:
+    return pd.DataFrame()
+  df = pd.DataFrame(fees_list)
+
+  # 移除不需要顯示的 id 欄位
+  if "id" in df.columns:
+    df = df.drop(columns=["id"])
+
+  # 欄位重新命名（英文轉中文）
+  rename_map = {
+      "unit_code": "戶號",
+      "year": "年度",
+      "status": "繳費狀態",
+      "amount": "付款金額 (元)",
+      "payment_method": "付款方式",
+      "payment_date": "付款日期",
+      "notes": "備註 / 簽收人",
+  }
+  df = df.rename(columns=rename_map)
+
+  # 調整欄位排序（若欄位存在）
+  preferred_order = [
+      "戶號",
+      "年度",
+      "繳費狀態",
+      "付款金額 (元)",
+      "付款方式",
+      "付款日期",
+      "備註 / 簽收人",
+  ]
+  existing_cols = [c for c in preferred_order if c in df.columns]
+  other_cols = [c for c in df.columns if c not in preferred_order]
+  df = df[existing_cols + other_cols]
+
+  return df
+
+
 if has_management_rights:
-  user_role_label = (
+  role_title = (
       "管理員"
       if (current_user_unit and current_user_unit.get("is_admin"))
-      else (
-          current_user_unit.get("role")
-          if (current_user_unit and current_user_unit.get("role"))
-          else "財務委員"
-      )
+      else "財務委員"
   )
   st.success(
-      f"👑 您目前是以【{user_role_label} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
+      f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
   )
 
   year_fees = [
       f for f in all_fees_raw if str(f.get("year")) == str(selected_year)
   ]
   if year_fees:
-    st.dataframe(year_fees, use_container_width=True)
+    df_display = format_fee_dataframe(year_fees)
+    st.dataframe(df_display, use_container_width=True)
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
@@ -133,7 +165,6 @@ if has_management_rights:
       with col_f3:
         pay_date = st.date_input("付款日期", value=date.today())
 
-      # 簽收人預設自動帶入：戶號(任期-財委)
       signer = st.text_input("簽收人", value=default_treasurer_signer)
       notes = st.text_input("備註")
       submit_fee = st.form_submit_button("儲存繳費紀錄")
@@ -181,6 +212,7 @@ else:
   ]
 
   if my_fees:
-    st.dataframe(my_fees, use_container_width=True)
+    df_my = format_fee_dataframe(my_fees)
+    st.dataframe(df_my, use_container_width=True)
   else:
     st.info(f"查無您的 {selected_year} 年度繳費紀錄，或管理員尚未登錄。")
