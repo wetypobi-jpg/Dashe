@@ -38,7 +38,9 @@ if st.session_state.is_admin:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  with st.expander(f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理員專用)"):
+  with st.expander(
+      f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理員專用)"
+  ):
     with st.form("update_fee_form"):
       target_unit = st.selectbox(
           "選擇戶號",
