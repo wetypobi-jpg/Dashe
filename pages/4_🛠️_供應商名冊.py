@@ -13,7 +13,7 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("🛠️ 維修與供應商名冊")
+st.title("🛠️ 吾映良品柒社區 - 維修與供應商名冊")
 st.write("平時找不到師傅？常用維修廠商與電話總整理：")
 
 vendors = supabase.table("vendors").select("*").execute().data
@@ -31,7 +31,7 @@ if vendors:
     with st.expander(f"🏢 {v['vendor_name']} （類別：{v['category']}）"):
       st.write(f"**聯絡人**：{v.get('contact_person', '未填寫')}")
       st.markdown(f"📞 **電話**：[{v['phone']}](tel:{v['phone']})")
-      st.write(f"**最近服務年份**：{v.get('last_service_year', '無')}")
+      # 已移除最近服務年份，版面更清爽
       st.write(f"**評價與備註**：{v.get('notes', '無')}")
 else:
   st.info("目前尚無供應商資料。")
