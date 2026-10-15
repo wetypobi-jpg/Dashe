@@ -16,9 +16,8 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("💰 管理費繳交紀錄")
+st.title("💰 吾映良品柒社區 - 管理費繳交紀錄")
 
-# 從資料庫抓取所有繳費紀錄
 all_fees_raw = supabase.table("fee_records").select("*").execute().data
 
 if all_fees_raw:
@@ -30,11 +29,18 @@ else:
 st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
 # ==========================================
-# 1. 管理員 / 財委身分：檢視全社區總表與維護更新
+# 判斷是否具備管理權限 (管理員 或 財委)
 # ==========================================
-if st.session_state.is_admin:
+has_management_rights = st.session_state.get(
+    "is_admin", False
+) or st.session_state.get("is_treasurer", False)
+
+if has_management_rights:
+  role_title = (
+      "管理員" if st.session_state.get("is_admin") else "財務委員"
+  )
   st.success(
-      f"👑 您目前是以【管理員 ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
+      f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
   )
 
   year_fees = [
@@ -45,9 +51,9 @@ if st.session_state.is_admin:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  # 管理員專用：新增與更新表單 (包含金額、付款方式、付款日期)
+  # 管理權限專用：新增與更新表單 (包含金額、付款方式、付款日期)
   with st.expander(
-      f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理員專用)"
+      f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理員/財委專用)"
   ):
     with st.form("update_fee_form"):
       target_unit = st.selectbox(
@@ -80,7 +86,7 @@ if st.session_state.is_admin:
               "608-27",
           ],
       )
-      input_year = st.text_input("輸入年度 (例如: 2026)", value=selected_year)
+      input_year = st.text_input("輸入年度 (例如: 115)", value=selected_year)
       pay_status = st.selectbox("繳費狀態", ["已繳", "未繳"])
 
       col_f1, col_f2, col_f3 = st.columns(3)
@@ -88,7 +94,7 @@ if st.session_state.is_admin:
         pay_amount = st.number_input("付款金額 (元)", value=1000, step=100)
       with col_f2:
         pay_method = st.selectbox(
-            "付款方式", ["現金", "轉帳", "其他"]
+            "付款方式", ["現金", "轉帳", "Line Pay", "其他"]
         )
       with col_f3:
         pay_date = st.date_input("付款日期", value=date.today())
@@ -100,7 +106,6 @@ if st.session_state.is_admin:
       submit_fee = st.form_submit_button("儲存繳費紀錄")
 
       if submit_fee:
-        # 檢查該戶該年度是否已有紀錄
         existing = (
             supabase.table("fee_records")
             .select("id")
@@ -116,7 +121,7 @@ if st.session_state.is_admin:
             "status": pay_status,
             "amount": pay_amount,
             "payment_method": pay_method,
-            "payment_date": str(pay_date),  # 轉為字串格式存入 Supabase DATE 欄位
+            "payment_date": str(pay_date),
             "notes": f"簽收人: {signer} | 備註: {notes}",
         }
 
@@ -131,7 +136,7 @@ if st.session_state.is_admin:
         st.rerun()
 
 # ==========================================
-# 2. 一般住戶身分：僅能查詢自己的個人繳交紀錄
+# 一般住戶身分：僅能查詢自己的個人繳交紀錄
 # ==========================================
 else:
   st.info(
