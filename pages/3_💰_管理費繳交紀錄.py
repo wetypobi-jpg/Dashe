@@ -80,7 +80,7 @@ if st.session_state.is_admin:
               "608-27",
           ],
       )
-      input_year = st.text_input("輸入年度 (例如: 115)", value=selected_year)
+      input_year = st.text_input("輸入年度 (例如: 2026)", value=selected_year)
       pay_status = st.selectbox("繳費狀態", ["已繳", "未繳"])
 
       col_f1, col_f2, col_f3 = st.columns(3)
@@ -88,7 +88,7 @@ if st.session_state.is_admin:
         pay_amount = st.number_input("付款金額 (元)", value=1000, step=100)
       with col_f2:
         pay_method = st.selectbox(
-            "付款方式", ["現金", "轉帳", "Line Pay", "其他"]
+            "付款方式", ["現金", "轉帳", "其他"]
         )
       with col_f3:
         pay_date = st.date_input("付款日期", value=date.today())
