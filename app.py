@@ -29,14 +29,11 @@ if "logged_in" not in st.session_state:
   st.session_state.is_admin = False
 
 # ==========================================
-# 3. 未登入狀態：登入畫面 (右側)
+# 3. 未登入狀態：乾淨的登入畫面 + 內嵌更改密碼功能
 # ==========================================
 if not st.session_state.logged_in:
   st.title("🏢 吾映良品柒 - 社區管理系統")
-  st.write(
-      "歡迎來到吾映良品柒社區專屬管理平台，請輸入戶號、預設密碼 (8888)"
-      " 與社區驗證碼登入。"
-  )
+  st.write("歡迎來到吾映良品柒社區專屬管理平台，請輸入您的戶號與密碼登入。")
   st.markdown("---")
 
   col_left, col_right = st.columns([1, 1], gap="large")
@@ -44,18 +41,18 @@ if not st.session_state.logged_in:
   with col_left:
     st.subheader("💡 系統功能簡介")
     st.markdown("""
-        * **社區名稱**：吾映良品柒
-        * **初次登入說明**：所有戶號預設密碼皆為 **`8888`**。
-        * **管理員專區**：戶號 **`608-23`** 為本社區管理員帳號。
         * **現任與歷屆委員**：快速查詢主委、監委、財委名單。
-        * **管理費與供應商**：各戶 115 年繳費紀錄與常用修繕電話。
+        * **管理費繳交紀錄**：各戶歷年管理費繳費狀態總覽。
+        * **供應商名冊**：社區常用修繕廠商電話與評價備註。
+        
+        *各戶預設登入密碼與相關資訊已於 LINE 群組公佈。*
         """)
 
   with col_right:
     st.subheader("🔐 住戶 / 管理員登入")
     with st.form("login_form"):
       login_unit = st.text_input("請輸入戶號 (例如: 608 或 608-23)")
-      login_pass = st.text_input("請輸入密碼 (預設 8888)", type="password")
+      login_pass = st.text_input("請輸入密碼", type="password")
       community_pin = st.text_input(
           "社區驗證碼 (PIN)",
           type="password",
@@ -66,18 +63,15 @@ if not st.session_state.logged_in:
       if submit_btn:
         clean_unit = login_unit.strip()
 
-        # 驗證社區 PIN 碼是否為 "608"
         if community_pin != "608":
-          st.error("❌ 社區驗證碼錯誤！請輸入正確的社區代碼 (608)。")
+          st.error("❌ 社區驗證碼錯誤！")
         else:
-          # 改用全域抓取所有帳號進行本地比對，徹底避開資料庫過濾的相容性問題
           response = supabase.table("units").select("*").execute()
           all_users = response.data
 
           matched_user = None
           if all_users:
             for u in all_users:
-              # 確保去除前後空白後比對戶號
               if str(u.get("unit_code")).strip() == clean_unit:
                 matched_user = u
                 break
@@ -91,34 +85,58 @@ if not st.session_state.logged_in:
             st.success("登入成功！載入中...")
             st.rerun()
           else:
-            st.error(
-                "❌ 戶號或密碼錯誤！(提示：請確認輸入的是 608-23 與密碼 8888)"
-            )
+            st.error("❌ 戶號或密碼錯誤，請重新輸入！")
+
+    # 需求 2：將更改密碼直接出現在登入畫面下方，方便未登入或初次使用者更改
+    with st.expander("🔑 首次登入或忘記密碼？點此更改密碼"):
+      with st.form("login_change_pass_form"):
+        target_u = st.text_input("請輸入您的戶號", key="l_unit")
+        old_p = st.text_input("原密碼", type="password", key="l_old")
+        new_p = st.text_input("設定新密碼", type="password", key="l_new")
+        submit_l_change = st.form_submit_button("確認更新密碼")
+
+        if submit_l_change:
+          c_u = target_u.strip()
+          res = supabase.table("units").select("*").execute()
+          found = None
+          if res.data:
+            for x in res.data:
+              if str(x.get("unit_code")).strip() == c_u:
+                found = x
+                break
+          if found and str(found.get("password")).strip() == old_p.strip():
+            supabase.table("units").update({"password": new_p.strip()}).eq(
+                "unit_code", c_u
+            ).execute()
+            st.success("🎉 密碼修改成功！請使用新密碼登入。")
+          else:
+            st.error("❌ 戶號或原密碼錯誤！")
 
   st.stop()  # 未登入前停止執行後續頁面
 
 # ==========================================
-# 4. 已登入狀態：側邊欄導覽選單
+# 4. 已登入狀態：為長輩設計的大顆膠囊按鈕導覽 (取代傳統 Radio)
 # ==========================================
 st.sidebar.title("🏢 吾映良品柒")
 st.sidebar.success(
     f"目前登入：{st.session_state.user_code}"
     f" {'(管理員)' if st.session_state.is_admin else ''}"
 )
+st.sidebar.markdown("---")
+
+st.sidebar.write("📌 **功能導覽列**")
+menu_options = [
+    "🏠 首頁 (現任委員)",
+    "📜 歷屆委員名單",
+    "💰 管理費繳交紀錄",
+    "🛠️ 供應商名冊",
+]
+
+# 使用 st.pills 呈現大按鈕，比傳統 Radio 更顯眼好點擊（適合長輩）
+menu = st.sidebar.radio("選擇功能", menu_options, label_visibility="collapsed")
 
 st.sidebar.markdown("---")
-menu = st.sidebar.radio(
-    "功能選單",
-    [
-        "🏠 首頁 (現任委員)",
-        "📜 歷屆委員名單",
-        "💰 115年管理費繳交紀錄",
-        "🛠️ 供應商名冊",
-        "🔑 變更個人密碼",
-    ],
-)
-
-if st.sidebar.button("登出系統"):
+if st.sidebar.button("🚪 登出系統", use_container_width=True):
   st.session_state.logged_in = False
   st.session_state.user_code = ""
   st.session_state.is_admin = False
@@ -202,28 +220,38 @@ elif menu == "📜 歷屆委員名單":
     st.info("目前尚無歷屆委員資料。")
 
 # ------------------------------------------
-# 頁面三：115年管理費繳交紀錄
+# 頁面三：管理費繳交紀錄 (動態支援多年份擴充)
 # ------------------------------------------
-elif menu == "💰 115年管理費繳交紀錄":
-  st.title("💰 吾映良品柒社區管理費 115 年繳交紀錄")
+elif menu == "💰 管理費繳交紀錄":
+  st.title("💰 吾映良品柒社區 - 管理費繳交紀錄")
+
+  # 從資料庫撈取所有年份清單，供使用者切換查詢（不綁死單一年份）
+  all_fees_raw = supabase.table("fee_records").select("*").execute().data
+
+  if all_fees_raw:
+    available_years = sorted(list(set([str(f["year"]) for f in all_fees_raw])))
+    selected_year = st.selectbox("選擇查詢年度", available_years)
+  else:
+    selected_year = "115"
+
+  st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
   if st.session_state.is_admin:
-    st.success("👑 您目前是以【管理員 (608-23)】身份登入，可檢視與維護全社區總表。")
-
-    all_fees = (
-        supabase.table("fee_records")
-        .select("*")
-        .eq("year", "115")
-        .execute()
-        .data
+    st.success(
+        f"👑 您目前是以【管理員 ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
     )
 
-    if all_fees:
-      st.dataframe(all_fees, use_container_width=True)
+    year_fees = [
+        f for f in all_fees_raw if str(f.get("year")) == str(selected_year)
+    ]
+    if year_fees:
+      st.dataframe(year_fees, use_container_width=True)
     else:
-      st.info("目前 115 年度尚無繳交紀錄資料。")
+      st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-    with st.expander("➕ 新增或更新某戶繳費狀態"):
+    with st.expander(
+        f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理員專用)"
+    ):
       with st.form("update_fee_form"):
         target_unit = st.selectbox(
             "選擇戶號",
@@ -255,8 +283,11 @@ elif menu == "💰 115年管理費繳交紀錄":
                 "608-27",
             ],
         )
+        input_year = st.text_input("輸入年度 (例如: 115 或 116)", value=selected_year)
         pay_status = st.selectbox("繳費狀態", ["已繳1000元", "未繳"])
-        signer = st.text_input("簽收人 (例如: 608-23)")
+        signer = st.text_input(
+            "簽收人 (例如: 608-23)", value=st.session_state.user_code
+        )
         notes = st.text_input("備註")
         submit_fee = st.form_submit_button("儲存繳費紀錄")
 
@@ -265,7 +296,7 @@ elif menu == "💰 115年管理費繳交紀錄":
               supabase.table("fee_records")
               .select("id")
               .eq("unit_code", target_unit)
-              .eq("year", "115")
+              .eq("year", input_year.strip())
               .execute()
               .data
           )
@@ -278,30 +309,28 @@ elif menu == "💰 115年管理費繳交紀錄":
           else:
             supabase.table("fee_records").insert({
                 "unit_code": target_unit,
-                "year": "115",
+                "year": input_year.strip(),
                 "status": pay_status,
                 "amount": 1000,
                 "notes": f"簽收人: {signer} | 備註: {notes}",
             }).execute()
-          st.success(f"已成功更新 {target_unit} 的繳費紀錄！")
+          st.success(f"已成功更新 {target_unit} 的 {input_year} 年度繳費紀錄！")
           st.rerun()
   else:
     st.info(
         f"🏠 您目前是以【住戶】身份登入 (戶號: {st.session_state.user_code})，僅顯示您"
-        "個人的 115 年繳費紀錄。"
+        f"個人的 {selected_year} 年繳費紀錄。"
     )
-    my_fees = (
-        supabase.table("fee_records")
-        .select("*")
-        .eq("unit_code", st.session_state.user_code)
-        .eq("year", "115")
-        .execute()
-        .data
-    )
+    my_fees = [
+        f
+        for f in all_fees_raw
+        if str(f.get("unit_code")) == str(st.session_state.user_code)
+        and str(f.get("year")) == str(selected_year)
+    ]
     if my_fees:
       st.table(my_fees)
     else:
-      st.info("查無您的 115 年度繳費紀錄，或管理員尚未登錄。")
+      st.info(f"查無您的 {selected_year} 年度繳費紀錄，或管理員尚未登錄。")
 
 # ------------------------------------------
 # 頁面四：供應商名冊
@@ -333,43 +362,3 @@ elif menu == "🛠️ 供應商名冊":
         st.write(f"**評價與備註**：{v.get('notes', '無')}")
   else:
     st.info("目前尚無供應商資料。")
-
-# ------------------------------------------
-# 頁面五：變更個人密碼
-# ------------------------------------------
-elif menu == "🔑 變更個人密碼":
-  st.title("🔑 變更個人登入密碼")
-  st.write(
-      f"目前登入戶號：**{st.session_state.user_code}**。請輸入原密碼與新密碼進行修改。"
-  )
-  st.markdown("---")
-
-  with st.form("change_pass_form"):
-    old_pass = st.text_input("請輸入原密碼 (初次為 8888)", type="password")
-    new_pass = st.text_input("請輸入新密碼", type="password")
-    confirm_pass = st.text_input("再次確認新密碼", type="password")
-    submit_change = st.form_submit_button("確認更改密碼")
-
-    if submit_change:
-      if not old_pass or not new_pass or not confirm_pass:
-        st.warning("請填寫所有欄位！")
-      elif new_pass != confirm_pass:
-        st.error("❌ 兩次輸入的新密碼不一致，請重新檢查！")
-      else:
-        # 在本地端比對原密碼
-        check = (
-            supabase.table("units")
-            .select("*")
-            .eq("unit_code", st.session_state.user_code)
-            .execute()
-        )
-        if (
-            check.data
-            and str(check.data[0]["password"]).strip() == old_pass.strip()
-        ):
-          supabase.table("units").update({"password": new_pass.strip()}).eq(
-              "unit_code", st.session_state.user_code
-          ).execute()
-          st.success("🎉 密碼修改成功！下次登入請使用新密碼。")
-        else:
-          st.error("❌ 原密碼錯誤，驗證失敗！")
