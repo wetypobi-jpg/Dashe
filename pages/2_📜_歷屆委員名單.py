@@ -14,6 +14,22 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
+# 注入 CSS 讓表格與區塊置中顯示，並增加外觀質感
+st.markdown("""
+    <style>
+    /* 將表格容器置中 */
+    .centered-table {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    /* 調整表格標題與文字居中對齊感 */
+    h3, h1 {
+        text-align: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("📜 吾映良品柒 - 歷屆委員服務統計與名單")
 st.write(
     "在這裡您可以查詢各戶歷年來擔任委員的**總服務次數與職稱統計**，以及詳細的歷史任期紀錄。"
@@ -53,7 +69,7 @@ if all_committees:
   # 定義自訂排序函式：將戶號如 "608-23" 拆解為 (608, 23) 以進行正確的數字遞增排序
   def sort_unit_key(unit_str):
     if unit_str == "608":
-      return (608, 0)  # 沒有附號的 608 排在最前面
+      return (608, 0)
     parts = str(unit_str).split("-")
     try:
       base = int(parts[0])
@@ -89,7 +105,11 @@ if all_committees:
 
   st.subheader("📊 各戶委員服務次數統計總表")
   st.write("查詢各戶歷年來為社區服務的總次數與各職稱分布（依戶號遞增排序）：")
-  st.dataframe(pivot_table, use_container_width=True)
+  
+  # 使用欄位排版讓表格居中顯示（左右留白，中間放表格）
+  col_l, col_m, col_r = st.columns([0.5, 9, 0.5])
+  with col_m:
+      st.dataframe(pivot_table, use_container_width=True)
 
   st.markdown("---")
 
