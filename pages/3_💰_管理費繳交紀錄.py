@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 from supabase import create_client
@@ -7,7 +7,6 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 權限檢查：未登入者禁止進入
 if (
     "logged_in" not in st.session_state
     or not st.session_state.logged_in
@@ -29,15 +28,33 @@ else:
 st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
 # ==========================================
-# 判斷是否具備管理權限 (管理員 或 財委)
+# 權限判定：管理員 或 當屆財務委員
 # ==========================================
-has_management_rights = st.session_state.get(
-    "is_admin", False
-) or st.session_state.get("is_treasurer", False)
+current_year_str = str(datetime.now().year)
+committees_data = supabase.table("committees").select("*").execute().data
+is_current_treasurer = False
+
+if committees_data:
+  for c in committees_data:
+    if (
+        str(c.get("year", "")) in current_year_str
+        and c.get("role") == "財務委員"
+        and str(c.get("unit_code")) == str(st.session_state.user_code)
+    ):
+      is_current_treasurer = True
+      break
+
+has_management_rights = (
+    st.session_state.get("is_admin", False)
+    or st.session_state.get("is_treasurer", False)
+    or is_current_treasurer
+)
 
 if has_management_rights:
   role_title = (
-      "管理員" if st.session_state.get("is_admin") else "財務委員"
+      "管理員"
+      if st.session_state.get("is_admin")
+      else ("財務委員" if is_current_treasurer else "授權管理員")
   )
   st.success(
       f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
@@ -51,9 +68,8 @@ if has_management_rights:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  # 管理權限專用：新增與更新表單 (包含金額、付款方式、付款日期)
   with st.expander(
-      f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理員/財委專用)"
+      f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理/財委專用)"
   ):
     with st.form("update_fee_form"):
       target_unit = st.selectbox(
@@ -134,10 +150,6 @@ if has_management_rights:
 
         st.success(f"已成功更新 {target_unit} 的 {input_year} 年度繳費紀錄！")
         st.rerun()
-
-# ==========================================
-# 一般住戶身分：僅能查詢自己的個人繳交紀錄
-# ==========================================
 else:
   st.info(
       f"🏠 您目前是以【住戶】身份登入 (戶號: {st.session_state.user_code})，僅顯示您"
