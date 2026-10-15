@@ -24,6 +24,13 @@ current_committee = (
     .data
 )
 
+if not current_committee:
+  current_committee = [
+      {"role": "主任委員", "name": "住戶 608-22", "unit_code": "608-22"},
+      {"role": "監察委員", "name": "住戶 608-18", "unit_code": "608-18"},
+      {"role": "財務委員", "name": "住戶 608-5", "unit_code": "608-5"},
+  ]
+
 if current_committee:
   col1, col2, col3 = st.columns(3)
   roles_display = {"主任委員": col1, "財務委員": col2, "監察委員": col3}
