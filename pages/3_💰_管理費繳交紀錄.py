@@ -28,21 +28,25 @@ else:
 st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
 # ==========================================
-# 權限判定：管理員 或 當屆財務委員
+# 權限判定與尋找當年度財委
 # ==========================================
 current_year_str = str(datetime.now().year)
 committees_data = supabase.table("committees").select("*").execute().data
 is_current_treasurer = False
+default_treasurer_signer = st.session_state.user_code  # 預設備援為當前登入者
 
 if committees_data:
   for c in committees_data:
-    if (
-        str(c.get("year", "")) in current_year_str
-        and c.get("role") == "財務委員"
-        and str(c.get("unit_code")) == str(st.session_state.user_code)
-    ):
-      is_current_treasurer = True
-      break
+    year_str = str(c.get("year", ""))
+    # 檢查是否為當年度的財務委員
+    if current_year_str in year_str and c.get("role") == "財務委員":
+      t_unit = c.get("unit_code", "")
+      t_name = c.get("name", "")
+      default_treasurer_signer = f"{t_unit}({t_name})" if t_name else t_unit
+
+      if str(t_unit) == str(st.session_state.user_code):
+        is_current_treasurer = True
+        break
 
 has_management_rights = (
     st.session_state.get("is_admin", False)
@@ -68,9 +72,8 @@ if has_management_rights:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  with st.expander(
-      f"➕ 新增或更新 {selected_year} 年度某戶繳費狀態 (管理/財委專用)"
-  ):
+  # 標題已改為：新增或更新 住戶繳費狀態
+  with st.expander("➕ 新增或更新 住戶繳費狀態 (管理/財委專用)"):
     with st.form("update_fee_form"):
       target_unit = st.selectbox(
           "選擇戶號",
@@ -115,9 +118,8 @@ if has_management_rights:
       with col_f3:
         pay_date = st.date_input("付款日期", value=date.today())
 
-      signer = st.text_input(
-          "簽收人 (例如: 608-23)", value=st.session_state.user_code
-      )
+      # 簽收人預設自動帶入當年度財委的 "戶號(姓名)"
+      signer = st.text_input("簽收人", value=default_treasurer_signer)
       notes = st.text_input("備註")
       submit_fee = st.form_submit_button("儲存繳費紀錄")
 
