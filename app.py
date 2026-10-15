@@ -1,12 +1,11 @@
 import streamlit as st
-from supabase import create_client, Client
+from supabase import create_client
 
 # ==========================================
-# 1. Supabase 連線設定
+# 1. 從 Streamlit 內建安全環境讀取 Supabase 設定
 # ==========================================
-# 請將這裡替換為您在 Supabase 專案中取得的 URL 與 Anon Key
-SUPABASE_URL = "您的_SUPABASE_URL"
-SUPABASE_KEY = "您的_SUPABASE_ANON_KEY"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 
 @st.cache_resource
