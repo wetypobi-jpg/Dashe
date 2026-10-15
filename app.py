@@ -29,13 +29,13 @@ if "logged_in" not in st.session_state:
 # ==========================================
 # 這裡可以把原本叫 app.py 的首頁自訂標題改為 "首頁" 或 "住戶登入"
 pg = st.navigation({
-    "吾映良品柒": [
+
         st.Page("app.py", title="🏠首頁", default=True),
         st.Page("pages/1_👥_現任委員.py", title="現任委員"),
         st.Page("pages/2_📜_歷屆委員名單.py", title="歷屆委員名單"),
         st.Page("pages/3_💰_管理費繳交紀錄.py", title="管理費繳交紀錄"),
         st.Page("pages/4_🛠️_供應商名冊.py", title="供應商名冊"),
-    ]
+    
 })
 
 # ==========================================
