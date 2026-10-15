@@ -209,11 +209,11 @@ if has_management_rights:
             with col_u2:
                 if existing_record:
                     st.info(
-                        f"ℹ️ 系統偵測：戶號 `{selected_target_unit}` 在 {current_year_str} 年度**已有紀錄**，表單已自動帶入，修改後送出即為「更新」。"
+                        f"ℹ️ 該住戶有資料，以下是自動帶入之內容，修改後送出即為更新。"
                     )
                 else:
                     st.info(
-                        f"ℹ️ 系統偵測：戶號 `{selected_target_unit}` 在 {current_year_str} 年度**尚無紀錄**，送出後將會「新增」一筆資料。"
+                        f"ℹ️ 無資料，注意現為新增功能，送出後將新增紀錄。"
                     )
 
             with st.form("update_fee_form"):
@@ -252,6 +252,21 @@ if has_management_rights:
                 submit_fee = st.form_submit_button("儲存繳費紀錄")
 
                 if submit_fee:
+                    # 防呆檢查：若記錄不存在，且資料庫中已存在該年度該戶號的資料，則阻止新增避免重複
+                    if not record_id:
+                        latest_check = (
+                            supabase.table("fee_records")
+                            .select("id")
+                            .eq("unit_code", selected_target_unit)
+                            .eq("year", current_year_str)
+                            .execute()
+                        )
+                        if latest_check.data and len(latest_check.data) > 0:
+                            st.error(
+                                f"❌ 錯誤：戶號 `{selected_target_unit}` 在 {current_year_str} 年度已有繳費紀錄，每戶每年僅能有一筆資料，請直接修改現有資料！"
+                            )
+                            st.stop()
+
                     payload = {
                         "unit_code": selected_target_unit,
                         "year": current_year_str,
