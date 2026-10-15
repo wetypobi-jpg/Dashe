@@ -24,10 +24,8 @@ all_committees = supabase.table("committees").select("*").execute().data
 
 if all_committees:
   # 1. 計算統計次數
-  # 我們將資料轉換成 DataFrame 來做統計分析
   df = pd.DataFrame(all_committees)
 
-  # 統計每一戶在各個職稱上擔任了幾次
   pivot_table = (
       df.pivot_table(
           index="unit_code",
@@ -51,7 +49,28 @@ if all_committees:
       + pivot_table["監察委員"]
   )
 
-  # 重新排序欄位
+
+  # 定義自訂排序函式：將戶號如 "608-23" 拆解為 (608, 23) 以進行正確的數字遞增排序
+  def sort_unit_key(unit_str):
+    if unit_str == "608":
+      return (608, 0)  # 沒有附號的 608 排在最前面
+    parts = str(unit_str).split("-")
+    try:
+      base = int(parts[0])
+      sub = int(parts[1]) if len(parts) > 1 else 0
+      return (base, sub)
+    except ValueError:
+      return (999, 999)
+
+
+  # 套用自訂排序到 DataFrame 中
+  pivot_table["sort_key"] = pivot_table["unit_code"].apply(sort_unit_key)
+  pivot_table = pivot_table.sort_values(by="sort_key").drop(
+      columns=["sort_key"]
+  )
+  pivot_table = pivot_table.reset_index(drop=True)
+
+  # 重新排序與命名欄位
   cols_order = [
       "unit_code",
       "總服務次數",
@@ -60,11 +79,6 @@ if all_committees:
       "監察委員",
   ]
   pivot_table = pivot_table[[c for c in cols_order if c in pivot_table.columns]]
-  pivot_table = pivot_table.sort_values(
-      by="總服務次數", ascending=False
-  ).reset_index(drop=True)
-
-  # 重新命名欄位以便長輩閱讀
   pivot_table.columns = [
       "戶號",
       "總服務次數",
@@ -74,7 +88,7 @@ if all_committees:
   ]
 
   st.subheader("📊 各戶委員服務次數統計總表")
-  st.write("查詢各戶歷年來為社區服務的總次數與各職稱分布：")
+  st.write("查詢各戶歷年來為社區服務的總次數與各職稱分布（依戶號遞增排序）：")
   st.dataframe(pivot_table, use_container_width=True)
 
   st.markdown("---")
