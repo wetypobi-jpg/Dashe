@@ -64,26 +64,30 @@ if not st.session_state.logged_in:
       submit_btn = st.form_submit_button("登入系統")
 
       if submit_btn:
-        # 去除輸入時可能多打的空白
         clean_unit = login_unit.strip()
 
         # 驗證社區 PIN 碼是否為 "608"
         if community_pin != "608":
           st.error("❌ 社區驗證碼錯誤！請輸入正確的社區代碼 (608)。")
         else:
-          # 查詢資料庫驗證戶號與密碼
-          response = (
-              supabase.table("units")
-              .select("*")
-              .eq("unit_code", clean_unit)
-              .execute()
-          )
-          user_data = response.data
+          # 改用全域抓取所有帳號進行本地比對，徹底避開資料庫過濾的相容性問題
+          response = supabase.table("units").select("*").execute()
+          all_users = response.data
 
-          if user_data and str(user_data[0]["password"]).strip() == login_pass:
+          matched_user = None
+          if all_users:
+            for u in all_users:
+              # 確保去除前後空白後比對戶號
+              if str(u.get("unit_code")).strip() == clean_unit:
+                matched_user = u
+                break
+
+          if matched_user and str(matched_user.get("password")).strip() == str(
+              login_pass
+          ).strip():
             st.session_state.logged_in = True
             st.session_state.user_code = clean_unit
-            st.session_state.is_admin = user_data[0]["is_admin"]
+            st.session_state.is_admin = bool(matched_user.get("is_admin"))
             st.success("登入成功！載入中...")
             st.rerun()
           else:
@@ -352,14 +356,18 @@ elif menu == "🔑 變更個人密碼":
       elif new_pass != confirm_pass:
         st.error("❌ 兩次輸入的新密碼不一致，請重新檢查！")
       else:
+        # 在本地端比對原密碼
         check = (
             supabase.table("units")
-            .select("password")
+            .select("*")
             .eq("unit_code", st.session_state.user_code)
             .execute()
         )
-        if check.data and str(check.data[0]["password"]).strip() == old_pass:
-          supabase.table("units").update({"password": new_pass}).eq(
+        if (
+            check.data
+            and str(check.data[0]["password"]).strip() == old_pass.strip()
+        ):
+          supabase.table("units").update({"password": new_pass.strip()}).eq(
               "unit_code", st.session_state.user_code
           ).execute()
           st.success("🎉 密碼修改成功！下次登入請使用新密碼。")
