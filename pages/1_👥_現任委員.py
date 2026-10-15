@@ -13,7 +13,7 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("🏢 現任委員名單")
+st.title("👥 現任委員名單")
 st.write("以下為本屆現任委員資訊：")
 
 current_committee = (
