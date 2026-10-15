@@ -120,7 +120,7 @@ if has_management_rights:
               "608-27",
           ],
       )
-      input_year = st.text_input("輸入年度 (例如: 115)", value=selected_year)
+      input_year = st.text_input("輸入年度 (例如: 2026)", value=selected_year)
       pay_status = st.selectbox("繳費狀態", ["已繳", "未繳"])
 
       col_f1, col_f2, col_f3 = st.columns(3)
