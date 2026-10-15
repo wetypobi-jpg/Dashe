@@ -19,23 +19,26 @@ st.title("💰 吾映良品柒社區 - 管理費繳交紀錄")
 
 all_fees_raw = supabase.table("fee_records").select("*").execute().data
 
+current_year_str = str(datetime.now().year)  # 取得今年 (2026)
+
 if all_fees_raw:
   available_years = sorted(list(set([str(f["year"]) for f in all_fees_raw])))
+  if current_year_str not in available_years:
+    available_years.insert(0, current_year_str)
   selected_year = st.selectbox("選擇查詢年度", available_years)
 else:
-  selected_year = "2026"
+  selected_year = current_year_str
 
 st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
 # ==========================================
-# 權限判定與動態抓取當年度財委 (格式：戶號(任期-職稱))
+# 權限判定與動態抓取當年度財委
 # ==========================================
-current_year_str = str(datetime.now().year)
 units_data = supabase.table("units").select("*").execute().data
 committees_data = supabase.table("committees").select("*").execute().data
 
 is_current_treasurer = False
-default_treasurer_signer = st.session_state.user_code  # 預設備援
+default_treasurer_signer = st.session_state.user_code
 
 current_user_unit = None
 if units_data:
@@ -62,7 +65,7 @@ has_management_rights = (
 )
 
 
-# 輔助函式：將原始資料轉為乾淨、中文表頭且無 ID 的 DataFrame
+# 輔助函式：將原始資料轉為中文表頭且無 ID 的 DataFrame
 def format_fee_dataframe(fees_list):
   if not fees_list:
     return pd.DataFrame()
@@ -117,45 +120,15 @@ if has_management_rights:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  with st.expander("➕ 新增或更新 住戶繳費狀態 (管理/財委專用)"):
-    edit_options = ["➕ 新增一筆紀錄"]
-    fee_map = {}
-    for f in year_fees:
-      label = f"戶號 {f['unit_code']} （狀態：{f['status']} | 金額：{f['amount']}）"
-      edit_options.append(label)
-      fee_map[label] = f
-
-    selected_action = st.selectbox(
-        "選擇操作模式（如需修改請直接點選該戶紀錄，或選擇新增）", edit_options
+  # 限制只能管理今年度的資料
+  if str(selected_year) != current_year_str:
+    st.warning(
+        f"⚠️ 依規定，管理與維護功能僅開放限今年度（{current_year_str}年）的資料。"
     )
-
-    default_unit = "608"
-    default_status = "未繳"
-    default_amount = 1000
-    default_method = "現金"
-    default_date = date.today()
-    default_notes = ""
-    target_record_id = None
-
-    if selected_action != "➕ 新增一筆紀錄":
-      target_record = fee_map[selected_action]
-      default_unit = target_record.get("unit_code", "608")
-      default_status = target_record.get("status", "未繳")
-      try:
-        default_amount = int(target_record.get("amount", 1000))
-      except:
-        default_amount = 1000
-      default_method = target_record.get("payment_method", "現金")
-      d_str = target_record.get("payment_date")
-      if d_str:
-        try:
-          default_date = datetime.strptime(str(d_str), "%Y-%m-%d").date()
-        except:
-          default_date = date.today()
-      default_notes = target_record.get("notes", "")
-      target_record_id = target_record.get("id")
-
-    with st.form("update_fee_form"):
+  else:
+    with st.expander(
+        f"➕ 新增或更新 {current_year_str} 年度住戶繳費狀態 (管理/財委專用)"
+    ):
       all_units_list = [
           "608",
           "608-1",
@@ -183,83 +156,115 @@ if has_management_rights:
           "608-26",
           "608-27",
       ]
-      unit_index = (
-          all_units_list.index(default_unit)
-          if default_unit in all_units_list
-          else 0
-      )
-      target_unit = st.selectbox(
-          "選擇戶號", all_units_list, index=unit_index
+
+      # 1. 先讓管理者選擇要操作哪一戶
+      selected_target_unit = st.selectbox(
+          "請選擇要新增或修改的住戶戶號", all_units_list
       )
 
-      input_year = st.text_input("輸入年度 (例如: 2026)", value=selected_year)
+      # 2. 自動檢查該戶在今年是否已有紀錄
+      existing_record = None
+      for f in year_fees:
+        if str(f.get("unit_code")) == str(selected_target_unit):
+          existing_record = f
+          break
 
-      status_options = ["已繳", "未繳"]
-      status_index = (
-          status_options.index(default_status)
-          if default_status in status_options
-          else 0
+      # 設定預設表單數值（有舊資料就帶入舊資料，沒有就用預設值）
+      default_status = (
+          existing_record.get("status", "未繳")
+          if existing_record
+          else "未繳"
       )
-      pay_status = st.selectbox(
-          "繳費狀態", status_options, index=status_index
+      default_amount = (
+          int(existing_record.get("amount", 1000))
+          if existing_record
+          else 1000
       )
+      default_method = (
+          existing_record.get("payment_method", "現金")
+          if existing_record
+          else "現金"
+      )
+      default_date = date.today()
+      if existing_record and existing_record.get("payment_date"):
+        try:
+          default_date = datetime.strptime(
+              str(existing_record.get("payment_date")), "%Y-%m-%d"
+          ).date()
+        except:
+          pass
+      default_notes = (
+          existing_record.get("notes", "") if existing_record else ""
+      )
+      record_id = existing_record.get("id") if existing_record else None
 
-      col_f1, col_f2, col_f3 = st.columns(3)
-      with col_f1:
-        # 修正數值型態一致性（皆為 int）
-        pay_amount = st.number_input(
-            "付款金額 (元)", value=int(default_amount), step=100
+      if existing_record:
+        st.info(
+            f"ℹ️ 系統偵測：戶號 `{selected_target_unit}` 在"
+            f" {current_year_str} 年度**已有繳費紀錄**，下方表單已自動帶入，修改後送出即為「更新」。"
         )
-      with col_f2:
-        method_options = ["現金", "轉帳", "Line Pay", "其他"]
-        method_index = (
-            method_options.index(default_method)
-            if default_method in method_options
+      else:
+        st.info(
+            f"ℹ️ 系統偵測：戶號 `{selected_target_unit}` 在"
+            f" {current_year_str} 年度**尚無紀錄**，送出後將會「新增」一筆資料。"
+        )
+
+      with st.form("update_fee_form"):
+        status_options = ["已繳", "未繳"]
+        status_index = (
+            status_options.index(default_status)
+            if default_status in status_options
             else 0
         )
-        pay_method = st.selectbox(
-            "付款方式", method_options, index=method_index
+        pay_status = st.selectbox(
+            "繳費狀態", status_options, index=status_index
         )
-      with col_f3:
-        pay_date = st.date_input("付款日期", value=default_date)
 
-      signer = st.text_input("簽收人", value=default_treasurer_signer)
-      notes = st.text_input("備註", value=default_notes)
-      submit_fee = st.form_submit_button("儲存繳費紀錄")
-
-      if submit_fee:
-        payload = {
-            "unit_code": target_unit,
-            "year": input_year.strip(),
-            "status": pay_status,
-            "amount": pay_amount,
-            "payment_method": pay_method,
-            "payment_date": str(pay_date),
-            "notes": f"簽收人: {signer} | 備註: {notes}",
-        }
-
-        if target_record_id:
-          supabase.table("fee_records").update(payload).eq(
-              "id", target_record_id
-          ).execute()
-        else:
-          existing = (
-              supabase.table("fee_records")
-              .select("id")
-              .eq("unit_code", target_unit)
-              .eq("year", input_year.strip())
-              .execute()
-              .data
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+          pay_amount = st.number_input(
+              "付款金額 (元)", value=int(default_amount), step=100
           )
-          if existing:
+        with col_f2:
+          method_options = ["現金", "轉帳", "Line Pay", "其他"]
+          method_index = (
+              method_options.index(default_method)
+              if default_method in method_options
+              else 0
+          )
+          pay_method = st.selectbox(
+              "付款方式", method_options, index=method_index
+          )
+        with col_f3:
+          pay_date = st.date_input("付款日期", value=default_date)
+
+        signer = st.text_input("簽收人", value=default_treasurer_signer)
+        notes = st.text_input("備註", value=default_notes)
+        submit_fee = st.form_submit_button("儲存繳費紀錄")
+
+        if submit_fee:
+          payload = {
+              "unit_code": selected_target_unit,
+              "year": current_year_str,  # 強制鎖定今年
+              "status": pay_status,
+              "amount": pay_amount,
+              "payment_method": pay_method,
+              "payment_date": str(pay_date),
+              "notes": f"簽收人: {signer} | 備註: {notes}",
+          }
+
+          if record_id:
             supabase.table("fee_records").update(payload).eq(
-                "id", existing[0]["id"]
+                "id", record_id
             ).execute()
           else:
             supabase.table("fee_records").insert(payload).execute()
 
-        st.success(f"已成功儲存 {target_unit} 的 {input_year} 年度繳費紀錄！")
-        st.rerun()
+          st.success(
+              f"已成功儲存戶號 `{selected_target_unit}` 的"
+              f" {current_year_str} 年度繳費紀錄！"
+          )
+          st.rerun()
 else:
   st.info(
       f"🏠 您目前是以【住戶】身份登入 (戶號: {st.session_state.user_code})，僅顯示您"
