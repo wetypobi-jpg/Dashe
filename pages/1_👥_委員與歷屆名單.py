@@ -25,7 +25,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("👥 委員名單與歷屆紀錄")
+st.title("🏢 吾映良品柒社區 - 委員名單與歷屆紀錄")
 st.write("在這裡您可以查看本屆現任委員，或是切換至分頁查詢歷屆服務次數與詳細任期紀錄。")
 st.markdown("---")
 
@@ -39,22 +39,23 @@ if all_committees:
   ])
 
   # ==========================================
-  # 頁籤一：本屆現任委員 (透過當前年份 2026 自動比對)
+  # 頁籤一：本屆現任委員 (自動抓取當前年份比對)
   # ==========================================
   with tab1:
-    st.subheader("🏢 吾映良品柒社區 - 現任委員名單 (2024-2026)")
-    st.write("以下為本屆現任委員資訊：")
+    current_year_str = str(datetime.now().year)  # 自動取得當前年份 (例如 2026)
+    st.subheader(
+        f"🏢 吾映良品柒社區 - 現任委員名單 ({current_year_str}年度)"
+    )
+    st.write("以下為本屆現任委員資訊（系統依當前年份自動對應）：")
 
-    current_year_str = str(datetime.now().year)  # 取得 2026
-
-    # 篩選出任期年份包含當前年份的紀錄
+    # 自動比對任期欄位是否包含當前年份
     current_committee = []
     for c in all_committees:
       year_range = str(c.get("year", ""))
       if current_year_str in year_range:
         current_committee.append(c)
 
-    # 自動備援防護名單
+    # 若資料庫剛好沒有當年度資料時的備援顯示
     if not current_committee:
       current_committee = [
           {"role": "主任委員", "name": "住戶 608-22", "unit_code": "608-22"},
@@ -75,7 +76,9 @@ if all_committees:
         with target_col:
           st.info(f"**{role}**\n\n👤 **{name}**\n\n🏠 戶號：`{unit}`")
     else:
-      st.warning("目前資料庫中尚未設定現任委員。")
+      st.warning(
+          f"目前資料庫中尚未設定 {current_year_str} 年度的現任委員任期資料。"
+      )
 
   # ==========================================
   # 頁籤二：各戶服務次數統計總表
