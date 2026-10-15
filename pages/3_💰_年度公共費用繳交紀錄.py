@@ -15,7 +15,7 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("💰 年度公共費用繳交紀錄")
+st.title("💰 吾映良品柒社區 - 管理費繳交紀錄")
 
 all_fees_raw = supabase.table("fee_records").select("*").execute().data
 
@@ -65,7 +65,7 @@ has_management_rights = (
 )
 
 
-# 輔助函式：將原始資料轉為中文表頭且無 ID 的 DataFrame
+# 輔助函式：將原始資料轉為中文表頭且無 ID 的 DataFrame（簽收人與備註分開）
 def format_fee_dataframe(fees_list):
   if not fees_list:
     return pd.DataFrame()
@@ -74,6 +74,7 @@ def format_fee_dataframe(fees_list):
   if "id" in df.columns:
     df = df.drop(columns=["id"])
 
+  # 如果舊資料是用 notes 欄位，相容對應到新的簽收人/備註
   rename_map = {
       "unit_code": "戶號",
       "year": "年度",
@@ -81,7 +82,8 @@ def format_fee_dataframe(fees_list):
       "amount": "付款金額 (元)",
       "payment_method": "付款方式",
       "payment_date": "付款日期",
-      "notes": "備註 / 簽收人",
+      "notes": "簽收人",
+      "remarks": "備註",
   }
   df = df.rename(columns=rename_map)
 
@@ -92,7 +94,8 @@ def format_fee_dataframe(fees_list):
       "付款金額 (元)",
       "付款方式",
       "付款日期",
-      "備註 / 簽收人",
+      "簽收人",
+      "備註",
   ]
   existing_cols = [c for c in preferred_order if c in df.columns]
   other_cols = [c for c in df.columns if c not in preferred_order]
@@ -108,7 +111,7 @@ if has_management_rights:
       else "財務委員"
   )
   st.success(
-      f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
+      f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入, 可檢視與維護全社區總表。"
   )
 
   year_fees = [
@@ -120,14 +123,13 @@ if has_management_rights:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  # 限制只能管理今年度的資料
   if str(selected_year) != current_year_str:
     st.warning(
         f"⚠️ 依規定，管理與維護功能僅開放限今年度（{current_year_str}年）的資料。"
     )
   else:
     with st.expander(
-        f"➕ 新增或更新 {current_year_str} 年度住戶繳費狀態 (財委專用)"
+        f"➕ 新增或更新 {current_year_str} 年度住戶繳費狀態 (管理/財委專用)"
     ):
       all_units_list = [
           "608",
@@ -157,19 +159,16 @@ if has_management_rights:
           "608-27",
       ]
 
-      # 1. 先讓管理者選擇要操作哪一戶
       selected_target_unit = st.selectbox(
           "請選擇要新增或修改的住戶戶號", all_units_list
       )
 
-      # 2. 自動檢查該戶在今年是否已有紀錄
       existing_record = None
       for f in year_fees:
         if str(f.get("unit_code")) == str(selected_target_unit):
           existing_record = f
           break
 
-      # 設定預設表單數值（有舊資料就帶入舊資料，沒有就用預設值）
       default_status = (
           existing_record.get("status", "未繳")
           if existing_record
@@ -193,8 +192,15 @@ if has_management_rights:
           ).date()
         except:
           pass
-      default_notes = (
-          existing_record.get("notes", "") if existing_record else ""
+
+      # 簽收人與備註獨立抓取
+      default_signer = (
+          existing_record.get("notes", default_treasurer_signer)
+          if existing_record
+          else default_treasurer_signer
+      )
+      default_remarks = (
+          existing_record.get("remarks", "") if existing_record else ""
       )
       record_id = existing_record.get("id") if existing_record else None
 
@@ -238,19 +244,22 @@ if has_management_rights:
         with col_f3:
           pay_date = st.date_input("付款日期", value=default_date)
 
-        signer = st.text_input("簽收人", value=default_treasurer_signer)
-        notes = st.text_input("備註", value=default_notes)
+        # 獨立的簽收人與備註輸入框
+        signer = st.text_input("簽收人", value=default_signer)
+        remarks = st.text_input("備註", value=default_remarks)
+
         submit_fee = st.form_submit_button("儲存繳費紀錄")
 
         if submit_fee:
           payload = {
               "unit_code": selected_target_unit,
-              "year": current_year_str,  # 強制鎖定今年
+              "year": current_year_str,
               "status": pay_status,
               "amount": pay_amount,
               "payment_method": pay_method,
               "payment_date": str(pay_date),
-              "notes": f"簽收人: {signer} | 備註: {notes}",
+              "notes": signer,  # 獨立儲存至 notes (簽收人)
+              "remarks": remarks,  # 獨立儲存至 remarks (備註)
           }
 
           if record_id:
