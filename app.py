@@ -16,11 +16,9 @@ def init_connection():
 supabase = init_connection()
 
 # ==========================================
-# 2. 頁面標題與工作欄設定
+# 2. 頁面基本設定
 # ==========================================
 st.set_page_config(page_title="608社區管理系統", page_icon="🏢", layout="wide")
-
-st.sidebar.title("🏢 608社區管理系統")
 
 # Session State 初始化登入狀態
 if "logged_in" not in st.session_state:
@@ -29,74 +27,95 @@ if "logged_in" not in st.session_state:
   st.session_state.is_admin = False
 
 # ==========================================
-# 3. 登入與修改密碼區塊 (Sidebar)
+# 3. 未登入狀態：將登入畫面移至主畫面（左右分栏，右側登入）
 # ==========================================
 if not st.session_state.logged_in:
-  st.sidebar.subheader("🔐 住戶/管理員登入")
-  login_unit = st.sidebar.text_input("請輸入戶號 (例如: 608-1)")
-  login_pass = st.sidebar.text_input("請輸入密碼", type="password")
+  st.title("🏢 608社區管理系統")
+  st.write("歡迎來到 608 社區專屬管理平台，請先登入以繼續操作。")
+  st.markdown("---")
 
-  if st.sidebar.button("登入"):
-    # 查詢資料庫驗證密碼
-    response = (
-        supabase.table("units")
-        .select("*")
-        .eq("unit_code", login_unit)
-        .execute()
-    )
-    user_data = response.data
+  # 建立左右兩欄（左側說明，右側放登入表單）
+  col_left, col_right = st.columns([1, 1], gap="large")
 
-    if user_data and user_data[0]["password"] == login_pass:
-      st.session_state.logged_in = True
-      st.session_state.user_code = login_unit
-      st.session_state.is_admin = user_data[0]["is_admin"]
-      st.sidebar.success(f"歡迎 {login_unit} 登入！")
-      st.rerun()
-    else:
-      st.sidebar.error("戶號或密碼錯誤！")
+  with col_left:
+    st.subheader("💡 系統功能簡介")
+    st.markdown("""
+        * **現任與歷屆委員**：快速查詢主委、監委、財委名單與歷史交接紀錄。
+        * **管理費繳交紀錄**：各戶專屬繳費查詢與管理員總表。
+        * **供應商名冊**：社區常用修繕廠商電話與評價備註，隨時找得到人！
+        
+        *如有帳號或密碼相關問題，請聯絡社區管委會管理員。*
+        """)
 
-  st.stop()  # 未登入前停止執行後續網頁
-else:
-  st.sidebar.success(
-      f"目前登入：{st.session_state.user_code}"
-      f" {'(管理員)' if st.session_state.is_admin else ''}"
-  )
+  with col_right:
+    st.subheader("🔐 住戶 / 管理員登入")
+    with st.form("login_form"):
+      login_unit = st.text_input("請輸入戶號 (例如: 608 或 608-1)")
+      login_pass = st.text_input("請輸入密碼", type="password")
+      submit_btn = st.form_submit_button("登入系統")
 
-  # 短期開放：修改密碼功能
-  with st.sidebar.expander("🔑 變更個人密碼"):
-    old_pass = st.text_input("原密碼", type="password", key="old_pass")
-    new_pass = st.text_input("新密碼", type="password", key="new_pass")
-    if st.button("確認修改密碼"):
-      # 驗證原密碼
-      check = (
-          supabase.table("units")
-          .select("password")
-          .eq("unit_code", st.session_state.user_code)
-          .execute()
-      )
-      if check.data and check.data[0]["password"] == old_pass:
-        supabase.table("units").update({"password": new_pass}).eq(
-            "unit_code", st.session_state.user_code
-        ).execute()
-        st.success("密碼修改成功！")
-      else:
-        st.error("原密碼錯誤！")
+      if submit_btn:
+        response = (
+            supabase.table("units")
+            .select("*")
+            .eq("unit_code", login_unit)
+            .execute()
+        )
+        user_data = response.data
 
-  if st.sidebar.button("登出系統"):
-    st.session_state.logged_in = False
-    st.session_state.user_code = ""
-    st.session_state.is_admin = False
-    st.rerun()
+        if user_data and user_data[0]["password"] == login_pass:
+          st.session_state.logged_in = True
+          st.session_state.user_code = login_unit
+          st.session_state.is_admin = user_data[0]["is_admin"]
+          st.success("登入成功！載入中...")
+          st.rerun()
+        else:
+          st.error("戶號或密碼錯誤，請重新輸入！")
 
-  # 側邊欄導覽選單
-  st.sidebar.markdown("---")
-  menu = st.sidebar.radio(
-      "功能選單",
-      ["🏠 首頁 (現任委員)", "📜 歷屆委員名單", "💰 管理費繳交紀錄", "🛠️ 供應商名冊"],
-  )
+  st.stop()  # 未登入前停止執行後續頁面
 
 # ==========================================
-# 4. 各頁面內容實作
+# 4. 已登入狀態：側邊欄顯示導覽與個人設定
+# ==========================================
+st.sidebar.title("🏢 608社區管理系統")
+st.sidebar.success(
+    f"目前登入：{st.session_state.user_code}"
+    f" {'(管理員)' if st.session_state.is_admin else ''}"
+)
+
+# 修改密碼功能
+with st.sidebar.expander("🔑 變更個人密碼"):
+  old_pass = st.text_input("原密碼", type="password", key="old_pass")
+  new_pass = st.text_input("新密碼", type="password", key="new_pass")
+  if st.button("確認修改密碼"):
+    check = (
+        supabase.table("units")
+        .select("password")
+        .eq("unit_code", st.session_state.user_code)
+        .execute()
+    )
+    if check.data and check.data[0]["password"] == old_pass:
+      supabase.table("units").update({"password": new_pass}).eq(
+          "unit_code", st.session_state.user_code
+      ).execute()
+      st.success("密碼修改成功！")
+    else:
+      st.error("原密碼錯誤！")
+
+if st.sidebar.button("登出系統"):
+  st.session_state.logged_in = False
+  st.session_state.user_code = ""
+  st.session_state.is_admin = False
+  st.rerun()
+
+st.sidebar.markdown("---")
+menu = st.sidebar.radio(
+    "功能選單",
+    ["🏠 首頁 (現任委員)", "📜 歷屆委員名單", "💰 管理費繳交紀錄", "🛠️ 供應商名冊"],
+)
+
+# ==========================================
+# 5. 各頁面內容實作
 # ==========================================
 
 # ------------------------------------------
@@ -104,9 +123,8 @@ else:
 # ------------------------------------------
 if menu == "🏠 首頁 (現任委員)":
   st.title("🏢 608社區管委會 - 現任委員名單")
-  st.write("歡迎使用 608 社區管理系統！以下為本屆現任委員資訊：")
+  st.write("以下為本屆現任委員資訊：")
 
-  # 從資料庫抓取現任委員 (is_current = True)
   current_committee = (
       supabase.table("committees")
       .select("*")
@@ -116,17 +134,13 @@ if menu == "🏠 首頁 (現任委員)":
   )
 
   if current_committee:
-    # 呈現三巨頭或現任委員卡片
     col1, col2, col3 = st.columns(3)
-
-    # 簡單過濾主委、財委、監委
     roles_display = {"主任委員": col1, "財務委員": col2, "監察委員": col3}
 
     for item in current_committee:
       role = item.get("role")
       name = item.get("name")
       unit = item.get("unit_code")
-      term = item.get("term")
 
       target_col = roles_display.get(role, col1)
       with target_col:
@@ -162,7 +176,6 @@ elif menu == "📜 歷屆委員名單":
   all_committees = supabase.table("committees").select("*").execute().data
 
   if all_committees:
-    # 讓使用者依「屆數」或「年份」篩選
     terms = sorted(list(set([c["term"] for c in all_committees])))
     selected_term = st.selectbox("選擇查詢屆數", terms)
 
@@ -221,7 +234,6 @@ elif menu == "🛠️ 供應商名冊":
   vendors = supabase.table("vendors").select("*").execute().data
 
   if vendors:
-    # 類別篩選
     categories = list(set([v["category"] for v in vendors]))
     selected_cat = st.selectbox(
         "依服務類別篩選", ["全部顯示"] + categories
@@ -236,10 +248,8 @@ elif menu == "🛠️ 供應商名冊":
       with st.expander(
           f"🏢 {v['vendor_name']} （類別：{v['category']}）"
       ):
-        st.write(f"**聯絡人**：{v.get('contact_person', '未填寫')}社")
-        st.markdown(
-            f"📞 **電話**：[{v['phone']}](tel:{v['phone']})"
-        )  # 支援手機直接點擊撥號
+        st.write(f"**聯絡人**：{v.get('contact_person', '未填寫')}")
+        st.markdown(f"📞 **電話**：[{v['phone']}](tel:{v['phone']})")
         st.write(f"**最近服務年份**：{v.get('last_service_year', '無')}")
         st.write(f"**評價與備註**：{v.get('notes', '無')}")
   else:
