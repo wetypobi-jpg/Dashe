@@ -16,11 +16,12 @@ st.set_page_config(
     page_title="吾映良品柒 - 社區管理系統", page_icon="🏢", layout="wide"
 )
 
-# 初始化登入狀態
+# 初始化登入狀態 (包含 is_admin 與 is_treasurer)
 if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
   st.session_state.user_code = ""
   st.session_state.is_admin = False
+  st.session_state.is_treasurer = False
 
 # ==========================================
 # 未登入狀態：顯示登入與更改密碼畫面
@@ -35,8 +36,8 @@ if not st.session_state.logged_in:
   with col_left:
     st.subheader("💡 系統功能簡介")
     st.markdown("""
-        * **現任與歷屆委員**：快速查詢主委、監委、財委名單與個人歷年服務次數。
-        * **管理費繳交紀錄**：各戶歷年管理費繳費狀態總覽。
+        * **委員與歷屆名單**：本屆現任委員與各戶歷年服務次數統計。
+        * **管理費繳交紀錄**：各戶歷年管理費繳費狀態與金額明細。
         * **供應商名冊**：社區常用修繕廠商電話與評價備註。
         
         *各戶預設登入密碼與相關資訊已於 LINE 群組公佈。*
@@ -71,6 +72,9 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.user_code = clean_unit
             st.session_state.is_admin = bool(matched_user.get("is_admin"))
+            st.session_state.is_treasurer = bool(
+                matched_user.get("is_treasurer")
+            )
             st.success("登入成功！載入中...")
             st.rerun()
           else:
@@ -106,21 +110,28 @@ if not st.session_state.logged_in:
 # 已登入狀態：側邊欄與首頁歡迎區塊
 # ==========================================
 st.sidebar.title("🏢 吾映良品柒")
-st.sidebar.success(
-    f"目前登入：{st.session_state.user_code}"
-    f" {'(管理員)' if st.session_state.is_admin else ''}"
-)
+
+role_badge = ""
+if st.session_state.is_admin:
+  role_badge = "(管理員)"
+elif st.session_state.is_treasurer:
+  role_badge = "(財務委員)"
+else:
+  role_badge = "(住戶)"
+
+st.sidebar.success(f"目前登入：{st.session_state.user_code} {role_badge}")
 st.sidebar.markdown("---")
 
 if st.sidebar.button("🚪 登出系統", use_container_width=True):
   st.session_state.logged_in = False
   st.session_state.user_code = ""
   st.session_state.is_admin = False
+  st.session_state.is_treasurer = False
   st.rerun()
 
 st.title("🏢 吾映良品柒社區管理系統")
 st.success(f"目前登入戶號：{st.session_state.user_code}")
 st.write("歡迎使用社區專屬管理系統！")
 st.info(
-    "👈 請從左側選單切換您要查看的功能（現任委員、歷屆委員名單、管理費繳交紀錄、供應商名冊）。"
+    "👈 請從左側選單切換您要查看的功能（委員與歷屆名單、管理費繳交紀錄、供應商名冊）。"
 )
