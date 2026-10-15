@@ -49,7 +49,7 @@ if all_committees:
         st.subheader(
             f"🏢 吾映良品柒社區 - 現任委員名單 ({current_year_str}年度)"
         )
-        st.write("以下為本屆現任委員資訊（系統依當前年份自動對應）：")
+        st.write("以下為本屆現任委員資訊：")
 
         # 自動比對任期欄位是否包含當前年份
         current_committee = []
