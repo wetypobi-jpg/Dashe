@@ -74,6 +74,23 @@ def format_fee_dataframe(fees_list):
     if "id" in df.columns:
         df = df.drop(columns=["id"])
 
+    # 排序輔助函數：依 608、608-1、608-2... 遞增排序
+    def sort_unit_key(unit_str):
+        if unit_str == "608":
+            return (608, 0)
+        parts = str(unit_str).split("-")
+        try:
+            base = int(parts[0])
+            sub = int(parts[1]) if len(parts) > 1 else 0
+            return (base, sub)
+        except ValueError:
+            return (999, 999)
+
+    if "unit_code" in df.columns:
+        df["sort_key"] = df["unit_code"].apply(sort_unit_key)
+        df = df.sort_values(by="sort_key").drop(columns=["sort_key"])
+        df = df.reset_index(drop=True)
+
     # 如果舊資料是用 notes 欄位，相容對應到新的簽收人/備註
     rename_map = {
         "unit_code": "戶號",
