@@ -28,7 +28,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("🏢 吾映良品柒社區 - 委員名單與歷屆紀錄")
+st.title("🏢 委員名單與歷屆紀錄")
 st.write("在這裡您可以查看本屆現任委員，或是切換至分頁查詢歷屆服務次數與詳細任期紀錄。")
 st.markdown("---")
 
