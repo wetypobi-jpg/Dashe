@@ -68,11 +68,9 @@ def format_fee_dataframe(fees_list):
     return pd.DataFrame()
   df = pd.DataFrame(fees_list)
 
-  # 移除不需要顯示的 id 欄位
   if "id" in df.columns:
     df = df.drop(columns=["id"])
 
-  # 欄位重新命名（英文轉中文）
   rename_map = {
       "unit_code": "戶號",
       "year": "年度",
@@ -84,7 +82,6 @@ def format_fee_dataframe(fees_list):
   }
   df = df.rename(columns=rename_map)
 
-  # 調整欄位排序（若欄位存在）
   preferred_order = [
       "戶號",
       "年度",
@@ -121,64 +118,115 @@ if has_management_rights:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
   with st.expander("➕ 新增或更新 住戶繳費狀態 (管理/財委專用)"):
+    # 讓管理者選擇是要「新增一筆」還是「選擇現有紀錄進行修改」
+    edit_options = ["➕ 新增一筆紀錄"]
+    fee_map = {}
+    for f in year_fees:
+      label = f"戶號 {f['unit_code']} （狀態：{f['status']} | 金額：{f['amount']}）"
+      edit_options.append(label)
+      fee_map[label] = f
+
+    selected_action = st.selectbox(
+        "選擇操作模式（如需修改請直接點選該戶紀錄，或選擇新增）", edit_options
+    )
+
+    # 預設表單數值（用於新增模式）
+    default_unit = "608"
+    default_status = "未繳"
+    default_amount = 1000
+    default_method = "現金"
+    default_date = date.today()
+    default_notes = ""
+    target_record_id = None
+
+    # 如果選擇的是修改現有紀錄，則將該筆資料帶入預設值
+    if selected_action != "➕ 新增一筆紀錄":
+      target_record = fee_map[selected_action]
+      default_unit = target_record.get("unit_code", "608")
+      default_status = target_record.get("status", "未繳")
+      default_amount = target_record.get("amount", 1000)
+      default_method = target_record.get("payment_method", "現金")
+      d_str = target_record.get("payment_date")
+      if d_str:
+        try:
+          default_date = datetime.strptime(str(d_str), "%Y-%m-%d").date()
+        except:
+          default_date = date.today()
+      default_notes = target_record.get("notes", "")
+      target_record_id = target_record.get("id")
+
     with st.form("update_fee_form"):
-      target_unit = st.selectbox(
-          "選擇戶號",
-          [
-              "608",
-              "608-1",
-              "608-2",
-              "608-3",
-              "608-5",
-              "608-6",
-              "608-7",
-              "608-8",
-              "608-9",
-              "608-10",
-              "608-11",
-              "608-12",
-              "608-13",
-              "608-15",
-              "608-16",
-              "608-17",
-              "608-18",
-              "608-19",
-              "608-20",
-              "608-21",
-              "608-22",
-              "608-23",
-              "608-25",
-              "608-26",
-              "608-27",
-          ],
+      all_units_list = [
+          "608",
+          "608-1",
+          "608-2",
+          "608-3",
+          "608-5",
+          "608-6",
+          "608-7",
+          "608-8",
+          "608-9",
+          "608-10",
+          "608-11",
+          "608-12",
+          "608-13",
+          "608-15",
+          "608-16",
+          "608-17",
+          "608-18",
+          "608-19",
+          "608-20",
+          "608-21",
+          "608-22",
+          "608-23",
+          "608-25",
+          "608-26",
+          "608-27",
+      ]
+      unit_index = (
+          all_units_list.index(default_unit)
+          if default_unit in all_units_list
+          else 0
       )
+      target_unit = st.selectbox(
+          "選擇戶號", all_units_list, index=unit_index
+      )
+
       input_year = st.text_input("輸入年度 (例如: 2026)", value=selected_year)
-      pay_status = st.selectbox("繳費狀態", ["已繳", "未繳"])
+
+      status_options = ["已繳", "未繳"]
+      status_index = (
+          status_options.index(default_status)
+          if default_status in status_options
+          else 0
+      )
+      pay_status = st.selectbox(
+          "繳費狀態", status_options, index=status_index
+      )
 
       col_f1, col_f2, col_f3 = st.columns(3)
       with col_f1:
-        pay_amount = st.number_input("付款金額 (元)", value=1000, step=100)
+        pay_amount = st.number_input(
+            "付款金額 (元)", value=float(default_amount), step=100
+        )
       with col_f2:
+        method_options = ["現金", "轉帳", "Line Pay", "其他"]
+        method_index = (
+            method_options.index(default_method)
+            if default_method in method_options
+            else 0
+        )
         pay_method = st.selectbox(
-            "付款方式", ["現金", "轉帳", "Line Pay", "其他"]
+            "付款方式", method_options, index=method_index
         )
       with col_f3:
-        pay_date = st.date_input("付款日期", value=date.today())
+        pay_date = st.date_input("付款日期", value=default_date)
 
       signer = st.text_input("簽收人", value=default_treasurer_signer)
-      notes = st.text_input("備註")
+      notes = st.text_input("備註", value=default_notes)
       submit_fee = st.form_submit_button("儲存繳費紀錄")
 
       if submit_fee:
-        existing = (
-            supabase.table("fee_records")
-            .select("id")
-            .eq("unit_code", target_unit)
-            .eq("year", input_year.strip())
-            .execute()
-            .data
-        )
-
         payload = {
             "unit_code": target_unit,
             "year": input_year.strip(),
@@ -189,14 +237,29 @@ if has_management_rights:
             "notes": f"簽收人: {signer} | 備註: {notes}",
         }
 
-        if existing:
+        if target_record_id:
+          # 如果是選擇修改現有紀錄，透過 ID 直接更新
           supabase.table("fee_records").update(payload).eq(
-              "id", existing[0]["id"]
+              "id", target_record_id
           ).execute()
         else:
-          supabase.table("fee_records").insert(payload).execute()
+          # 如果是新增模式，檢查該戶該年度是否已有紀錄，有則更新、無則新增
+          existing = (
+              supabase.table("fee_records")
+              .select("id")
+              .eq("unit_code", target_unit)
+              .eq("year", input_year.strip())
+              .execute()
+              .data
+          )
+          if existing:
+            supabase.table("fee_records").update(payload).eq(
+                "id", existing[0]["id"]
+            ).execute()
+          else:
+            supabase.table("fee_records").insert(payload).execute()
 
-        st.success(f"已成功更新 {target_unit} 的 {input_year} 年度繳費紀錄！")
+        st.success(f"已成功儲存 {target_unit} 的 {input_year} 年度繳費紀錄！")
         st.rerun()
 else:
   st.info(
