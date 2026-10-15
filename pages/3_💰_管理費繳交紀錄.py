@@ -28,40 +28,56 @@ else:
 st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
 
 # ==========================================
-# 權限判定與尋找當年度財委
+# 權限判定與動態抓取當年度財委 (格式：戶號(任期-職稱))
 # ==========================================
 current_year_str = str(datetime.now().year)
+units_data = supabase.table("units").select("*").execute().data
 committees_data = supabase.table("committees").select("*").execute().data
-is_current_treasurer = False
-default_treasurer_signer = st.session_state.user_code  # 預設備援為當前登入者
 
+is_current_treasurer = False
+default_treasurer_signer = st.session_state.user_code  # 預設備援
+
+# 1. 先從 units 檢查該使用者是否具備管理員或財委身分
+current_user_unit = None
+if units_data:
+  for u in units_data:
+    if str(u.get("unit_code")) == str(st.session_state.user_code):
+      current_user_unit = u
+      break
+
+# 2. 自動尋找當年度的財委並組合格式 "戶號(任期-職稱)"
 if committees_data:
   for c in committees_data:
     year_str = str(c.get("year", ""))
-    # 檢查是否為當年度的財務委員
     if current_year_str in year_str and c.get("role") == "財務委員":
       t_unit = c.get("unit_code", "")
       t_name = c.get("name", "")
-      default_treasurer_signer = f"{t_unit}({t_name})" if t_name else t_unit
+      # 組合格式：戶號(任期-財委) 或 戶號(姓名-財委)
+      default_treasurer_signer = f"{t_unit}({year_str}-財委)"
+      break
 
-      if str(t_unit) == str(st.session_state.user_code):
-        is_current_treasurer = True
-        break
+# 如果 units 裡面直接記錄了 role == '財委' 也可以做雙重對照
+if current_user_unit and current_user_unit.get("role") == "財委":
+  is_current_treasurer = True
 
 has_management_rights = (
-    st.session_state.get("is_admin", False)
-    or st.session_state.get("is_treasurer", False)
+    (current_user_unit and current_user_unit.get("is_admin"))
+    or (current_user_unit and current_user_unit.get("role") in ["主委", "財委"])
     or is_current_treasurer
 )
 
 if has_management_rights:
-  role_title = (
+  user_role_label = (
       "管理員"
-      if st.session_state.get("is_admin")
-      else ("財務委員" if is_current_treasurer else "授權管理員")
+      if (current_user_unit and current_user_unit.get("is_admin"))
+      else (
+          current_user_unit.get("role")
+          if (current_user_unit and current_user_unit.get("role"))
+          else "財務委員"
+      )
   )
   st.success(
-      f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
+      f"👑 您目前是以【{user_role_label} ({st.session_state.user_code})】身份登入，可檢視與維護全社區總表。"
   )
 
   year_fees = [
@@ -72,7 +88,6 @@ if has_management_rights:
   else:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
-  # 標題已改為：新增或更新 住戶繳費狀態
   with st.expander("➕ 新增或更新 住戶繳費狀態 (管理/財委專用)"):
     with st.form("update_fee_form"):
       target_unit = st.selectbox(
@@ -118,7 +133,7 @@ if has_management_rights:
       with col_f3:
         pay_date = st.date_input("付款日期", value=date.today())
 
-      # 簽收人預設自動帶入當年度財委的 "戶號(姓名)"
+      # 簽收人預設自動帶入：戶號(任期-財委)
       signer = st.text_input("簽收人", value=default_treasurer_signer)
       notes = st.text_input("備註")
       submit_fee = st.form_submit_button("儲存繳費紀錄")
