@@ -96,32 +96,28 @@ if all_committees:
       st.dataframe(pivot_table, use_container_width=True)
 
   # ------------------------------------------
-  # 頁籤二：詳細任期清單 + 戶號篩選選單
+  # 頁籤二：詳細任期清單 + 戶號篩選選單 (已移除備註欄位)
   # ------------------------------------------
   with tab2:
     st.subheader("📋 歷屆詳細任期與名單查詢")
 
-    # 取得所有曾當過委員的戶號清單，並依大小排序
     all_units = sorted(
         list(set([str(c["unit_code"]) for c in all_committees])),
         key=sort_unit_key,
     )
     unit_options = ["全部顯示"] + all_units
 
-    # 改用下拉選單讓住戶精準選擇戶號，避免輸入 "608" 全部被帶出的問題
     selected_unit_filter = st.selectbox("🔍 選擇或過濾特定戶號", unit_options)
 
     table_data = []
     for c in all_committees:
       unit_c = str(c["unit_code"])
-      # 如果有選擇特定戶號且不符，則跳過
       if selected_unit_filter != "全部顯示" and unit_c != selected_unit_filter:
         continue
       table_data.append({
           "任期/年份": c["year"],
           "職稱": c["role"],
           "戶號": unit_c,
-          "備註": "現任委員" if c.get("is_current") else "歷史紀錄",
       })
 
     if table_data:
