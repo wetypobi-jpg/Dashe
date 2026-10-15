@@ -13,8 +13,8 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("🛠️ 吾映良品柒社區 - 維修與供應商名冊")
-st.write("平時找不到師傅？常用維修廠商與電話總整理：")
+st.title("🛠️ 維修與供應商名冊")
+st.write("常用維修廠商與電話總整理：")
 
 vendors = supabase.table("vendors").select("*").execute().data
 
