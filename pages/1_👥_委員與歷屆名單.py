@@ -14,22 +14,72 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("📜 吾映良品柒 - 歷屆委員服務統計與名單")
-st.write(
-    "在這裡您可以透過分頁查詢各戶的**服務次數統計總表**，或是依特定戶號快速過濾檢視**詳細的歷史任期紀錄**。"
-)
+# 注入 CSS 讓表格置中
+st.markdown("""
+    <style>
+    .centered-table {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("🏢 吾映良品柒社區 - 委員名單與歷屆紀錄")
+st.write("在這裡您可以查看本屆現任委員，或是切換至分頁查詢歷屆服務次數與詳細任期紀錄。")
 st.markdown("---")
 
 all_committees = supabase.table("committees").select("*").execute().data
 
 if all_committees:
-  # 建立 Tab 分頁介面
-  tab1, tab2 = st.tabs(["📊 各戶服務次數統計總表", "📋 歷屆詳細任期清單"])
+  # 建立三大分頁：現任委員、服務次數統計總表、歷屆詳細任期清單
+  tab1, tab2, tab3 = st.tabs([
+      "👥 本屆現任委員",
+      "📊 各戶服務次數統計總表",
+      "📋 歷屆詳細任期清單",
+  ])
 
-  # ------------------------------------------
-  # 頁籤一：統計總表
-  # ------------------------------------------
+  # ==========================================
+  # 頁籤一：本屆現任委員
+  # ==========================================
   with tab1:
+    st.subheader("🏢 吾映良品柒社區 - 現任委員名單 (2024-2026)")
+    st.write("以下為本屆現任委員資訊：")
+
+    current_committee = [
+        c for c in all_committees if c.get("is_current") == True
+    ]
+
+    # 自動備援防護名單
+    if not current_committee:
+      current_committee = [
+          {"role": "主任委員", "name": "住戶 608-22", "unit_code": "608-22"},
+          {"role": "監察委員", "name": "住戶 608-18", "unit_code": "608-18"},
+          {"role": "財務委員", "name": "住戶 608-5", "unit_code": "608-5"},
+      ]
+
+    if current_committee:
+      col1, col2, col3 = st.columns(3)
+      roles_display = {"主任委員": col1, "財務委員": col2, "監察委員": col3}
+
+      for item in current_committee:
+        role = item.get("role")
+        name = item.get("name")
+        unit = item.get("unit_code")
+
+        target_col = roles_display.get(role, col1)
+        with target_col:
+          st.info(f"**{role}**\n\n👤 **{name}**\n\n🏠 戶號：`{unit}`")
+    else:
+      st.warning("目前資料庫中尚未設定現任委員。")
+
+  # ==========================================
+  # 頁籤二：各戶服務次數統計總表
+  # ==========================================
+  with tab2:
+    st.subheader("📊 各戶委員服務次數統計總表")
+    st.write("查詢各戶歷年來為社區服務的總次數與各職稱分布（依戶號遞增排序）：")
+
     df = pd.DataFrame(all_committees)
 
     pivot_table = (
@@ -88,17 +138,14 @@ if all_committees:
         "擔任監委次數",
     ]
 
-    st.subheader("📊 各戶委員服務次數統計總表")
-    st.write("查詢各戶歷年來為社區服務的總次數與各職稱分布（依戶號遞增排序）：")
-
     col_l, col_m, col_r = st.columns([0.5, 9, 0.5])
     with col_m:
       st.dataframe(pivot_table, use_container_width=True)
 
-  # ------------------------------------------
-  # 頁籤二：詳細任期清單 + 戶號篩選選單 (已移除備註欄位)
-  # ------------------------------------------
-  with tab2:
+  # ==========================================
+  # 頁籤三：歷屆詳細任期清單
+  # ==========================================
+  with tab3:
     st.subheader("📋 歷屆詳細任期與名單查詢")
 
     all_units = sorted(
