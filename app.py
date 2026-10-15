@@ -64,6 +64,9 @@ if not st.session_state.logged_in:
       submit_btn = st.form_submit_button("登入系統")
 
       if submit_btn:
+        # 去除輸入時可能多打的空白
+        clean_unit = login_unit.strip()
+
         # 驗證社區 PIN 碼是否為 "608"
         if community_pin != "608":
           st.error("❌ 社區驗證碼錯誤！請輸入正確的社區代碼 (608)。")
@@ -72,19 +75,21 @@ if not st.session_state.logged_in:
           response = (
               supabase.table("units")
               .select("*")
-              .eq("unit_code", login_unit)
+              .eq("unit_code", clean_unit)
               .execute()
           )
           user_data = response.data
 
-          if user_data and user_data[0]["password"] == login_pass:
+          if user_data and str(user_data[0]["password"]).strip() == login_pass:
             st.session_state.logged_in = True
-            st.session_state.user_code = login_unit
+            st.session_state.user_code = clean_unit
             st.session_state.is_admin = user_data[0]["is_admin"]
             st.success("登入成功！載入中...")
             st.rerun()
           else:
-            st.error("❌ 戶號或密碼錯誤，請重新輸入！")
+            st.error(
+                "❌ 戶號或密碼錯誤！(提示：請確認輸入的是 608-23 與密碼 8888)"
+            )
 
   st.stop()  # 未登入前停止執行後續頁面
 
@@ -103,7 +108,7 @@ menu = st.sidebar.radio(
     [
         "🏠 首頁 (現任委員)",
         "📜 歷屆委員名單",
-        "💰 115年管理費紀錄",
+        "💰 115年管理費繳交紀錄",
         "🛠️ 供應商名冊",
         "🔑 變更個人密碼",
     ],
@@ -201,7 +206,6 @@ elif menu == "💰 115年管理費繳交紀錄":
   if st.session_state.is_admin:
     st.success("👑 您目前是以【管理員 (608-23)】身份登入，可檢視與維護全社區總表。")
 
-    # 管理員可以直接檢視或新增/更新紀錄
     all_fees = (
         supabase.table("fee_records")
         .select("*")
@@ -253,7 +257,6 @@ elif menu == "💰 115年管理費繳交紀錄":
         submit_fee = st.form_submit_button("儲存繳費紀錄")
 
         if submit_fee:
-          # 檢查是否已有該戶 115 年紀錄
           existing = (
               supabase.table("fee_records")
               .select("id")
@@ -355,7 +358,7 @@ elif menu == "🔑 變更個人密碼":
             .eq("unit_code", st.session_state.user_code)
             .execute()
         )
-        if check.data and check.data[0]["password"] == old_pass:
+        if check.data and str(check.data[0]["password"]).strip() == old_pass:
           supabase.table("units").update({"password": new_pass}).eq(
               "unit_code", st.session_state.user_code
           ).execute()
