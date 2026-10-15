@@ -15,7 +15,7 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-st.title("💰 吾映良品柒社區 - 管理費繳交紀錄")
+st.title("💰 年度公共費用繳交紀錄")
 
 all_fees_raw = supabase.table("fee_records").select("*").execute().data
 
