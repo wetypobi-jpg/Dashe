@@ -118,7 +118,6 @@ if has_management_rights:
     st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
 
   with st.expander("➕ 新增或更新 住戶繳費狀態 (管理/財委專用)"):
-    # 讓管理者選擇是要「新增一筆」還是「選擇現有紀錄進行修改」
     edit_options = ["➕ 新增一筆紀錄"]
     fee_map = {}
     for f in year_fees:
@@ -130,7 +129,6 @@ if has_management_rights:
         "選擇操作模式（如需修改請直接點選該戶紀錄，或選擇新增）", edit_options
     )
 
-    # 預設表單數值（用於新增模式）
     default_unit = "608"
     default_status = "未繳"
     default_amount = 1000
@@ -139,12 +137,14 @@ if has_management_rights:
     default_notes = ""
     target_record_id = None
 
-    # 如果選擇的是修改現有紀錄，則將該筆資料帶入預設值
     if selected_action != "➕ 新增一筆紀錄":
       target_record = fee_map[selected_action]
       default_unit = target_record.get("unit_code", "608")
       default_status = target_record.get("status", "未繳")
-      default_amount = target_record.get("amount", 1000)
+      try:
+        default_amount = int(target_record.get("amount", 1000))
+      except:
+        default_amount = 1000
       default_method = target_record.get("payment_method", "現金")
       d_str = target_record.get("payment_date")
       if d_str:
@@ -206,8 +206,9 @@ if has_management_rights:
 
       col_f1, col_f2, col_f3 = st.columns(3)
       with col_f1:
+        # 修正數值型態一致性（皆為 int）
         pay_amount = st.number_input(
-            "付款金額 (元)", value=float(default_amount), step=100
+            "付款金額 (元)", value=int(default_amount), step=100
         )
       with col_f2:
         method_options = ["現金", "轉帳", "Line Pay", "其他"]
@@ -238,12 +239,10 @@ if has_management_rights:
         }
 
         if target_record_id:
-          # 如果是選擇修改現有紀錄，透過 ID 直接更新
           supabase.table("fee_records").update(payload).eq(
               "id", target_record_id
           ).execute()
         else:
-          # 如果是新增模式，檢查該戶該年度是否已有紀錄，有則更新、無則新增
           existing = (
               supabase.table("fee_records")
               .select("id")
