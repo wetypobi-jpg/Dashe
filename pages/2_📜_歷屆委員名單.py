@@ -30,7 +30,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📜歷屆委員服務統計與名單")
+st.title("📜 歷屆委員服務統計與名單")
 st.write(
     "在這裡您可以查詢各戶歷年來擔任委員的**總服務次數與職稱統計**，以及詳細的歷史任期紀錄。"
 )
