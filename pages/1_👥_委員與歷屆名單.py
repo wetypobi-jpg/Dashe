@@ -1,3 +1,4 @@
+from datetime import datetime
 import pandas as pd
 import streamlit as st
 from supabase import create_client
@@ -14,7 +15,6 @@ if (
   st.warning("⚠️ 請先至首頁登入系統！")
   st.stop()
 
-# 注入 CSS 讓表格置中
 st.markdown("""
     <style>
     .centered-table {
@@ -25,14 +25,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🏢 吾映良品柒社區 - 委員名單與歷屆紀錄")
+st.title("👥 委員名單與歷屆紀錄")
 st.write("在這裡您可以查看本屆現任委員，或是切換至分頁查詢歷屆服務次數與詳細任期紀錄。")
 st.markdown("---")
 
 all_committees = supabase.table("committees").select("*").execute().data
 
 if all_committees:
-  # 建立三大分頁：現任委員、服務次數統計總表、歷屆詳細任期清單
   tab1, tab2, tab3 = st.tabs([
       "👥 本屆現任委員",
       "📊 各戶服務次數統計總表",
@@ -40,15 +39,20 @@ if all_committees:
   ])
 
   # ==========================================
-  # 頁籤一：本屆現任委員
+  # 頁籤一：本屆現任委員 (透過當前年份 2026 自動比對)
   # ==========================================
   with tab1:
     st.subheader("🏢 吾映良品柒社區 - 現任委員名單 (2024-2026)")
     st.write("以下為本屆現任委員資訊：")
 
-    current_committee = [
-        c for c in all_committees if c.get("is_current") == True
-    ]
+    current_year_str = str(datetime.now().year)  # 取得 2026
+
+    # 篩選出任期年份包含當前年份的紀錄
+    current_committee = []
+    for c in all_committees:
+      year_range = str(c.get("year", ""))
+      if current_year_str in year_range:
+        current_committee.append(c)
 
     # 自動備援防護名單
     if not current_committee:
@@ -64,7 +68,7 @@ if all_committees:
 
       for item in current_committee:
         role = item.get("role")
-        name = item.get("name")
+        name = item.get("name", "住戶")
         unit = item.get("unit_code")
 
         target_col = roles_display.get(role, col1)
