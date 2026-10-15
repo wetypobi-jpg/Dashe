@@ -16,7 +16,7 @@ if (
 
 st.title("📜 吾映良品柒 - 歷屆委員服務統計與名單")
 st.write(
-    "在這裡您可以透過分頁查詢各戶的**服務次數統計總表**，或是使用戶號搜尋**詳細的歷史任期紀錄**。"
+    "在這裡您可以透過分頁查詢各戶的**服務次數統計總表**，或是依特定戶號快速過濾檢視**詳細的歷史任期紀錄**。"
 )
 st.markdown("---")
 
@@ -96,21 +96,26 @@ if all_committees:
       st.dataframe(pivot_table, use_container_width=True)
 
   # ------------------------------------------
-  # 頁籤二：詳細任期清單 + 戶號搜尋
+  # 頁籤二：詳細任期清單 + 戶號篩選選單
   # ------------------------------------------
   with tab2:
     st.subheader("📋 歷屆詳細任期與名單查詢")
 
-    # 搜尋輸入框
-    search_query = st.text_input(
-        "🔍 輸入戶號搜尋（例如：608-23 或 608，若留空則顯示全部）", ""
-    ).strip()
+    # 取得所有曾當過委員的戶號清單，並依大小排序
+    all_units = sorted(
+        list(set([str(c["unit_code"]) for c in all_committees])),
+        key=sort_unit_key,
+    )
+    unit_options = ["全部顯示"] + all_units
+
+    # 改用下拉選單讓住戶精準選擇戶號，避免輸入 "608" 全部被帶出的問題
+    selected_unit_filter = st.selectbox("🔍 選擇或過濾特定戶號", unit_options)
 
     table_data = []
     for c in all_committees:
       unit_c = str(c["unit_code"])
-      # 如果有輸入搜尋條件且戶號不包含該字串，則跳過
-      if search_query and search_query.lower() not in unit_c.lower():
+      # 如果有選擇特定戶號且不符，則跳過
+      if selected_unit_filter != "全部顯示" and unit_c != selected_unit_filter:
         continue
       table_data.append({
           "任期/年份": c["year"],
@@ -122,6 +127,6 @@ if all_committees:
     if table_data:
       st.dataframe(table_data, use_container_width=True)
     else:
-      st.info(f"查無符合戶號「{search_query}」的歷史紀錄。")
+      st.info(f"查無符合戶號「{selected_unit_filter}」的歷史紀錄。")
 else:
   st.info("目前尚無委員資料。")
