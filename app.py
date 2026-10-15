@@ -27,21 +27,23 @@ if "logged_in" not in st.session_state:
 # ==========================================
 # 2. 使用 st.navigation 自訂左側選單名稱
 # ==========================================
-# 這裡可以把原本叫 app.py 的首頁自訂標題改為 "首頁" 或 "住戶登入"
 pg = st.navigation({
-  "吾映良品柒": [
-        st.Page("app.py", title="🏠首頁", default=True),
+    "吾映良品柒": [
+        st.Page("app.py", title="🏠 首頁", default=True),
         st.Page("pages/1_👥_現任委員.py", title="現任委員"),
         st.Page("pages/2_📜_歷屆委員名單.py", title="歷屆委員名單"),
         st.Page("pages/3_💰_管理費繳交紀錄.py", title="管理費繳交紀錄"),
         st.Page("pages/4_🛠️_供應商名冊.py", title="供應商名冊"),
-  ]
+    ]
 })
 
 # ==========================================
-# 3. 首頁 / 登入頁面實際內容
+# 3. 首頁 / 登入頁面實際內容 (使用 if-else 嚴格互斥)
 # ==========================================
 if st.session_state.logged_in:
+  # ------------------------------------------
+  # 狀態 A：已登入畫面
+  # ------------------------------------------
   st.title("🏢 吾映良品柒社區管理系統")
   st.success(
       f"目前登入戶號：{st.session_state.user_code}"
@@ -58,7 +60,11 @@ if st.session_state.logged_in:
     st.session_state.user_code = ""
     st.session_state.is_admin = False
     st.rerun()
+
 else:
+  # ------------------------------------------
+  # 狀態 B：未登入畫面 (使用 else 完美隔離)
+  # ------------------------------------------
   st.title("🏢 吾映良品柒 - 社區管理系統")
   st.write("歡迎來到吾映良品柒社區專屬管理平台，請輸入您的戶號與密碼登入。")
   st.markdown("---")
@@ -133,5 +139,5 @@ else:
           else:
             st.error("❌ 戶號或原密碼錯誤！")
 
-# 最後透過 pg.run() 渲染整體的導覽與頁面
+# 最後透過 pg.run() 渲染導覽
 pg.run()
