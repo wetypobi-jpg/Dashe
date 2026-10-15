@@ -127,7 +127,7 @@ if has_management_rights:
     )
   else:
     with st.expander(
-        f"➕ 新增或更新 {current_year_str} 年度住戶繳費狀態 (管理/財委專用)"
+        f"➕ 新增或更新 {current_year_str} 年度住戶繳費狀態 (財委專用)"
     ):
       all_units_list = [
           "608",
