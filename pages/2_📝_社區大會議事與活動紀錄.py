@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 import pandas as pd
 import streamlit as st
 from supabase import create_client
@@ -125,7 +125,7 @@ with tab_minutes:
             with st.container():
                 st.markdown(f"#### 📌 {m_date}｜{m_title}")
                 st.caption(
-                    f"👥 出席戶數：{m_attendees} 戶 ｜ ✍️ 記錄人：{m_creator}"
+                    f"👥 出席戶數：{m_attendees} 戶 ｜ ✍️ 記錄人（戶號）：{m_creator}"
                 )
                 st.markdown(m_content)
 
@@ -147,7 +147,7 @@ with tab_minutes:
 # ==========================================
 with tab_events:
     st.subheader("📅 社區大小事與重要活動歷程紀錄")
-    st.markdown("供住戶與管理團隊查閱各期間所執行的重大事項（例如收費期間、委員決議、修繕工程等）。")
+    st.markdown("供住戶與管理團隊查閱各期間所執行的重大事項（含精確起訖時間）。")
 
     if is_admin:
         with st.expander("➕ 新增社區重要記事/活動 (管理員專用)"):
@@ -155,16 +155,21 @@ with tab_events:
                 event_title = st.text_input(
                     "記事/活動標題", placeholder="例如：收取2026年度公共費用"
                 )
-                col_e1, col_e2, col_e3 = st.columns(3)
+                
+                col_e1, col_e2 = st.columns(2)
                 with col_e1:
-                    event_start = st.date_input("開始日期", value=date.today())
+                    st.markdown("**開始時間**")
+                    start_d = st.date_input("開始日期", value=date.today(), key="start_d")
+                    start_t = st.time_input("開始時間", value=time(9, 0), key="start_t")
                 with col_e2:
-                    has_end_date = st.checkbox("為日期區間 (選填結束日)", value=False)
-                    event_end = st.date_input("結束日期", value=date.today()) if has_end_date else None
-                with col_e3:
-                    event_category = st.selectbox(
-                        "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"]
-                    )
+                    st.markdown("**結束時間 (選填區間)**")
+                    has_end = st.checkbox("啟用結束時間區間", value=False)
+                    end_d = st.date_input("結束日期", value=date.today(), key="end_d") if has_end else None
+                    end_t = st.time_input("結束時間", value=time(18, 0), key="end_t") if has_end else None
+
+                event_category = st.selectbox(
+                    "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"]
+                )
 
                 event_desc = st.text_area(
                     "記事詳細說明",
@@ -178,9 +183,12 @@ with tab_events:
                     if not event_title.strip() or not event_desc.strip():
                         st.error("❌ 記事標題與說明不得為空！")
                     else:
+                        start_datetime = datetime.combine(start_d, start_t)
+                        end_datetime = datetime.combine(end_d, end_t) if has_end and end_d and end_t else None
+
                         payload_e = {
-                            "start_date": str(event_start),
-                            "end_date": str(event_end) if has_end_date and event_end else None,
+                            "start_time": str(start_datetime),
+                            "end_time": str(end_datetime) if end_datetime else None,
                             "title": event_title.strip(),
                             "category": event_category,
                             "description": event_desc.strip(),
@@ -194,7 +202,7 @@ with tab_events:
     events_raw = (
         supabase.table("community_events")
         .select("*")
-        .order("start_date", desc=True)
+        .order("start_time", desc=True)
         .execute()
         .data
     )
@@ -204,9 +212,9 @@ with tab_events:
             list(
                 set(
                     [
-                        str(e["start_date"][:4])
+                        str(e["start_time"][:4])
                         for e in events_raw
-                        if "start_date" in e
+                        if "start_time" in e
                     ]
                 )
             ),
@@ -219,26 +227,26 @@ with tab_events:
             filtered_events = [
                 e
                 for e in events_raw
-                if str(e["start_date"]).startswith(selected_year_e)
+                if str(e["start_time"]).startswith(selected_year_e)
             ]
 
         for e in filtered_events:
             e_id = e.get("id")
             e_title = e.get("title")
-            e_start = e.get("start_date")
-            e_end = e.get("end_date")
+            e_start = e.get("start_time")
+            e_end = e.get("end_time")
             e_cat = e.get("category", "一般記事")
             e_desc = e.get("description", "")
             e_creator = e.get("creator_unit", "")
 
-            # 組合日期顯示格式
-            date_display = e_start
-            if e_end and e_end != e_start:
-                date_display = f"{e_start} ~ {e_end}"
+            # 組合日期時間顯示格式
+            time_display = e_start
+            if e_end:
+                time_display = f"{e_start} ～ {e_end}"
 
             with st.container():
-                st.markdown(f"#### 🔹 【{e_cat}】{date_display}｜{e_title}")
-                st.caption(f"✍️ 紀錄戶號：{e_creator}")
+                st.markdown(f"#### 🔹 【{e_cat}】{time_display}｜{e_title}")
+                st.caption(f"✍️ 紀錄人（戶號）：{e_creator}")
                 st.write(e_desc)
 
                 if is_admin:
