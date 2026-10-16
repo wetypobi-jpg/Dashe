@@ -73,7 +73,7 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.user_code = clean_unit
             st.session_state.is_admin = bool(matched_user.get("is_admin"))
-            # 完整抓取資料庫中的 role 資訊 (例如 '主委', '財委', '監委' 或 None)
+            # 完整回傳資料庫中的 role 資訊 (例如 '主委', '財委', '監委' 或 None)
             st.session_state.role = matched_user.get("role")
             st.success("登入成功！載入中...")
             st.rerun()
@@ -114,7 +114,7 @@ st.sidebar.title("🏢 吾映良品柒")
 role_badge = ""
 if st.session_state.is_admin:
   role_badge = "(管理員)"
-elif st.session_state.role:
+elif st.session_state.get("role"):
   role_badge = f"({st.session_state.role})"
 else:
   role_badge = "(住戶)"
