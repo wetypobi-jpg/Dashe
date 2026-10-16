@@ -32,7 +32,7 @@ if units_data:
 is_admin = current_user_unit and current_user_unit.get("is_admin")
 user_role = current_user_unit.get("role") if current_user_unit else None
 
-# 【修正處】擴大管理權限，納入管理員、主委、財委、監委，讓主委也能新增與維護紀錄
+# 權限判斷：管理員可全權操作；主委、財委、監委可新增與更新 (解決主委無法新增的問題)
 can_manage = is_admin or (user_role in ["主委", "財委", "監委"])
 
 if can_manage:
