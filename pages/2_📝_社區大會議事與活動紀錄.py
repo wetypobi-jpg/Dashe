@@ -204,15 +204,13 @@ with tab_events:
                     "記事/活動標題", placeholder="例如：收取2026年度公共費用"
                 )
                 
-                st.markdown("⏱️ **起訖時間設定**")
-                
                 col_s1, col_s2 = st.columns(2)
                 with col_s1:
-                    st.markdown("**開始時間**")
+                    st.markdown("**⏱️開始時間**")
                     start_d = st.date_input("開始日期", value=date.today(), key="start_d")
                     start_t = st.time_input("開始時間", value=time(9, 0), key="start_t")
                 with col_s2:
-                    st.markdown("**結束時間**")
+                    st.markdown("**⏱️結束時間**")
                     end_d = st.date_input("結束日期", value=date.today(), key="end_d")
                     end_t = st.time_input("結束時間", value=time(18, 0), key="end_t")
 
