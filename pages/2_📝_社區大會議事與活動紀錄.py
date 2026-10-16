@@ -120,7 +120,7 @@ with tab_minutes:
                 if str(m["meeting_date"]).startswith(selected_year_m)
             ]
 
-        st.markdown("---")
+        
         
         if "edit_meeting_id" not in st.session_state:
             st.session_state.edit_meeting_id = None
