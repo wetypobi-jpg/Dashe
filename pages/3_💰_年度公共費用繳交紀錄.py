@@ -16,7 +16,6 @@ if (
     st.stop()
 
 st.title("💰 管理費繳交紀錄")
-st.markdown("---")
 
 all_fees_raw = supabase.table("fee_records").select("*").execute().data
 
@@ -61,7 +60,7 @@ if current_user_unit and current_user_unit.get("role") == "財委":
 
 has_management_rights = (
     (current_user_unit and current_user_unit.get("is_admin"))
-    or (current_user_unit and current_user_unit.get("role") in ["主委", "財委", "監委"]
+    or (current_user_unit and current_user_unit.get("role") == "財委")
     or is_current_treasurer
 )
 
