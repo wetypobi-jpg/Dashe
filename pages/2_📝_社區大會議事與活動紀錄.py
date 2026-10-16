@@ -204,7 +204,6 @@ with tab_events:
                     "記事/活動標題", placeholder="例如：收取2026年度公共費用"
                 )
                 
-                st.markdown("---")
                 st.markdown("⏱️ **起訖時間設定**")
                 
                 col_s1, col_s2 = st.columns(2)
@@ -217,7 +216,6 @@ with tab_events:
                     end_d = st.date_input("結束日期", value=date.today(), key="end_d")
                     end_t = st.time_input("結束時間", value=time(18, 0), key="end_t")
 
-                st.markdown("---")
                 event_category = st.selectbox(
                     "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"]
                 )
@@ -281,7 +279,6 @@ with tab_events:
                 if str(e["start_time"]).startswith(selected_year_e)
             ]
 
-        st.markdown("---")
 
         if "edit_event_id" not in st.session_state:
             st.session_state.edit_event_id = None
@@ -327,8 +324,6 @@ with tab_events:
                                 supabase.table("community_events").delete().eq("id", e_id).execute()
                                 st.warning(f"已刪除記事：{e_title}")
                                 st.rerun()
-
-                st.markdown("---")
 
                 if st.session_state.edit_event_id == e_id:
                     st.info(f"✏️ 正在修改記事：**{e_title}**")
