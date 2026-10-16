@@ -16,6 +16,7 @@ if (
     st.stop()
 
 st.title("💰 管理費繳交紀錄")
+st.markdown("---")
 
 all_fees_raw = supabase.table("fee_records").select("*").execute().data
 
