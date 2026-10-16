@@ -330,7 +330,7 @@ with tab_events:
                                 st.warning(f"已刪除記事：{e_title}")
                                 st.rerun()
 
-                st.markdown("---")
+                
 
                 if st.session_state.edit_event_id == e_id:
                     st.info(f"✏️ 正在修改記事：**{e_title}**")
