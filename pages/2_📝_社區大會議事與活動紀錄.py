@@ -289,18 +289,23 @@ with tab_events:
             e_desc = e.get("description", "")
             e_creator = e.get("creator_unit", "")
             
-            # 取得建立時間 (created_time)，若無則預設為空字串並格式化
+            # 取得建立時間 (created_time)
             e_created = str(e.get("created_time", "")).replace("T", " ")[:19] if e.get("created_time") else ""
 
             time_display = e_start
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            # 小卡收合時標題右側顯示 created_time
-            created_html = f"<span style='float: right; font-size: 13px; color: gray; font-weight: normal;'>發布時間: {e_created}</span>" if e_created else ""
-            expander_title = f"✨ 【{e_cat}】 {e_title} {created_html}"
+            # 修正：將 expander 標題改為乾淨文字，並透過內部 HTML 區塊完美呈現右側發布時間
+            expander_title = f"✨ 【{e_cat}】 {e_title}"
 
             with st.expander(expander_title):
+                if e_created:
+                    st.markdown(
+                        f"<p style='text-align: right; font-size: 13px; color: gray; margin-bottom: 0;'>發布時間: {e_created}</p>",
+                        unsafe_allow_html=True
+                    )
+
                 col_einfo, col_ebtn1, col_ebtn2 = st.columns([6, 1.5, 1.5])
                 with col_einfo:
                     st.markdown(
@@ -324,6 +329,8 @@ with tab_events:
                                 supabase.table("community_events").delete().eq("id", e_id).execute()
                                 st.warning(f"已刪除記事：{e_title}")
                                 st.rerun()
+
+                st.markdown("---")
 
                 if st.session_state.edit_event_id == e_id:
                     st.info(f"✏️ 正在修改記事：**{e_title}**")
