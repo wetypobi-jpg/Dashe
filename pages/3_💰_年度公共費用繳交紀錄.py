@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 import pandas as pd
 import streamlit as st
 from supabase import create_client
@@ -7,6 +7,7 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# 權限與登入檢查
 if (
     "logged_in" not in st.session_state
     or not st.session_state.logged_in
@@ -15,32 +16,12 @@ if (
     st.warning("⚠️ 請先至首頁登入系統！")
     st.stop()
 
-st.title("💰 管理費繳交紀錄")
+st.title("📝 吾映良品柒社區 - 議事與活動紀錄")
+st.markdown("✨ 記錄社區的大小事、重要會議與精采歷程，讓美好回憶與重要決議有跡可循！")
 st.markdown("---")
 
-all_fees_raw = supabase.table("fee_records").select("*").execute().data
-
-current_year_str = str(datetime.now().year)  # 取得今年 (2026)
-
-if all_fees_raw:
-    available_years = sorted(list(set([str(f["year"]) for f in all_fees_raw])))
-    if current_year_str not in available_years:
-        available_years.insert(0, current_year_str)
-    selected_year = st.selectbox("選擇查詢年度", available_years)
-else:
-    selected_year = current_year_str
-
-st.markdown(f"### 📅 {selected_year} 年度繳交狀態")
-
-# ==========================================
-# 權限判定與動態抓取當年度財委
-# ==========================================
+# 取得當前使用者身分與權限
 units_data = supabase.table("units").select("*").execute().data
-committees_data = supabase.table("committees").select("*").execute().data
-
-is_current_treasurer = False
-default_treasurer_signer = st.session_state.user_code
-
 current_user_unit = None
 if units_data:
     for u in units_data:
@@ -48,281 +29,354 @@ if units_data:
             current_user_unit = u
             break
 
-if committees_data:
-    for c in committees_data:
-        year_str = str(c.get("year", ""))
-        if current_year_str in year_str and c.get("role") == "財務委員":
-            t_unit = c.get("unit_code", "")
-            default_treasurer_signer = f"{t_unit}({year_str}-財委)"
-            break
+is_admin = current_user_unit and current_user_unit.get("is_admin")
+user_role = current_user_unit.get("role") if current_user_unit else None
 
-if current_user_unit and current_user_unit.get("role") == "財委":
-    is_current_treasurer = True
+# 【修正處】擴大管理權限，納入管理員、主委、財委、監委，讓主委也能新增與維護紀錄
+can_manage = is_admin or (user_role in ["主委", "財委", "監委"])
 
-has_management_rights = (
-    (current_user_unit and current_user_unit.get("is_admin"))
-    or (current_user_unit and current_user_unit.get("role") in ["主委", "財委", "監委"]
-    or is_current_treasurer
-)
-
-
-# 輔助函式：將原始資料轉為中文表頭且無 ID 的 DataFrame（簽收人與備註分開）
-def format_fee_dataframe(fees_list):
-    if not fees_list:
-        return pd.DataFrame()
-    df = pd.DataFrame(fees_list)
-
-    if "id" in df.columns:
-        df = df.drop(columns=["id"])
-
-    # 排序輔助函數：依 608、608-1、608-2... 遞增排序
-    def sort_unit_key(unit_str):
-        if unit_str == "608":
-            return (608, 0)
-        parts = str(unit_str).split("-")
-        try:
-            base = int(parts[0])
-            sub = int(parts[1]) if len(parts) > 1 else 0
-            return (base, sub)
-        except ValueError:
-            return (999, 999)
-
-    if "unit_code" in df.columns:
-        df["sort_key"] = df["unit_code"].apply(sort_unit_key)
-        df = df.sort_values(by="sort_key").drop(columns=["sort_key"])
-        df = df.reset_index(drop=True)
-
-    # 如果舊資料是用 notes 欄位，相容對應到新的簽收人/備註
-    rename_map = {
-        "unit_code": "戶號",
-        "year": "年度",
-        "status": "繳費狀態",
-        "amount": "付款金額 (元)",
-        "payment_method": "付款方式",
-        "payment_date": "付款日期",
-        "notes": "簽收人",
-        "remarks": "備註",
-    }
-    df = df.rename(columns=rename_map)
-
-    preferred_order = [
-        "戶號",
-        "年度",
-        "繳費狀態",
-        "付款金額 (元)",
-        "付款方式",
-        "付款日期",
-        "簽收人",
-        "備註",
-    ]
-    existing_cols = [c for c in preferred_order if c in df.columns]
-    other_cols = [c for c in df.columns if c not in preferred_order]
-    df = df[existing_cols + other_cols]
-
-    return df
-
-
-if has_management_rights:
-    role_title = (
-        "管理員"
-        if (current_user_unit and current_user_unit.get("is_admin"))
-        else "財務委員"
-    )
+if can_manage:
+    role_title = "管理員" if is_admin else f"{user_role}"
     st.success(
-        f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身份登入, 可檢視與維護全社區總表。"
+        f"👑 您目前是以【{role_title} ({st.session_state.user_code})】身分登入，可進行內容的新增與維護。"
     )
 
-    year_fees = [
-        f for f in all_fees_raw if str(f.get("year")) == str(selected_year)
-    ]
-    if year_fees:
-        df_display = format_fee_dataframe(year_fees)
-        st.dataframe(df_display, use_container_width=True)
-    else:
-        st.info(f"目前 {selected_year} 年度尚無繳交紀錄資料。")
+# 建立頁籤切換
+tab_minutes, tab_events = st.tabs(["📋 社區大會會議紀錄", "📅 社區重要記事與活動歷程"])
 
-    if str(selected_year) != current_year_str:
-        st.warning(
-            f"⚠️ 依規定，管理與維護功能僅開放限今年度（{current_year_str}年）的資料。"
+# ==========================================
+# 頁籤一：社區大會會議紀錄
+# ==========================================
+with tab_minutes:
+    st.subheader("📋 歷次社區大會會議紀錄與決議")
+
+    # 新增會議紀錄表單
+    if can_manage:
+        with st.expander("✨ ➕ 【點此展開】新增或發布新的社區大會會議紀錄"):
+            with st.form("add_meeting_form"):
+                new_title = st.text_input(
+                    "會議標題", placeholder="例如：2026年度第一次區分所有權人會議"
+                )
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    new_date = st.date_input("會議日期", value=date.today())
+                with col_m2:
+                    new_attendees = st.number_input(
+                        "出席戶數/人數", min_value=0, value=15, step=1
+                    )
+
+                new_content = st.text_area(
+                    "會議紀錄內容 (支援 Markdown 語法)",
+                    height=200,
+                    placeholder="請輸入討論事項、決議結果及交辦事項...",
+                )
+
+                submit_minute = st.form_submit_button("🚀 確認並發布會議紀錄")
+
+                if submit_minute:
+                    if not new_title.strip() or not new_content.strip():
+                        st.error("❌ 會議標題與內容不得為空！")
+                    else:
+                        payload = {
+                            "meeting_date": str(new_date),
+                            "title": new_title.strip(),
+                            "content": new_content.strip(),
+                            "attendees_count": int(new_attendees),
+                            "creator_unit": st.session_state.user_code,
+                        }
+                        supabase.table("meeting_minutes").insert(payload).execute()
+                        st.success("🎉 會議紀錄已成功發布！")
+                        st.rerun()
+
+    # 讀取會議紀錄資料
+    minutes_raw = (
+        supabase.table("meeting_minutes")
+        .select("*")
+        .order("meeting_date", desc=True)
+        .execute()
+        .data
+    )
+
+    if minutes_raw:
+        years_list = sorted(
+            list(
+                set(
+                    [
+                        str(m["meeting_date"][:4])
+                        for m in minutes_raw
+                        if "meeting_date" in m
+                    ]
+                )
+            ),
+            reverse=True,
         )
-    else:
-        with st.expander(
-            f"➕ 新增或更新 {current_year_str} 年度住戶繳費狀態 (管理/財委專用)"
-        ):
-            all_units_list = [
-                "608",
-                "608-1",
-                "608-2",
-                "608-3",
-                "608-5",
-                "608-6",
-                "608-7",
-                "608-8",
-                "608-9",
-                "608-10",
-                "608-11",
-                "608-12",
-                "608-13",
-                "608-15",
-                "608-16",
-                "608-17",
-                "608-18",
-                "608-19",
-                "608-20",
-                "608-21",
-                "608-22",
-                "608-23",
-                "608-25",
-                "608-26",
-                "608-27",
+        selected_year_m = st.selectbox("📅 選擇查看年度 (會議紀錄)", ["全部顯示"] + years_list, key="sel_year_m")
+
+        filtered_minutes = minutes_raw
+        if selected_year_m != "全部顯示":
+            filtered_minutes = [
+                m
+                for m in minutes_raw
+                if str(m["meeting_date"]).startswith(selected_year_m)
             ]
 
-            col_u1, col_u2 = st.columns([2, 3])
-            with col_u1:
-                selected_target_unit = st.selectbox(
-                    "請選擇要新增或修改的住戶戶號", all_units_list
-                )
+        st.markdown("---")
+        
+        if "edit_meeting_id" not in st.session_state:
+            st.session_state.edit_meeting_id = None
 
-            existing_record = None
-            for f in year_fees:
-                if str(f.get("unit_code")) == str(selected_target_unit):
-                    existing_record = f
-                    break
+        for m in filtered_minutes:
+            m_id = m.get("id")
+            m_title = m.get("title")
+            m_date = m.get("meeting_date")
+            m_attendees = m.get("attendees_count", 0)
+            m_creator = m.get("creator_unit", "")
+            m_content = m.get("content", "")
 
-            default_status = (
-                existing_record.get("status", "未繳")
-                if existing_record
-                else "未繳"
-            )
-            default_amount = (
-                int(existing_record.get("amount", 1000))
-                if existing_record
-                else 1000
-            )
-            default_method = (
-                existing_record.get("payment_method", "現金")
-                if existing_record
-                else "現金"
-            )
-            default_date = date.today()
-            if existing_record and existing_record.get("payment_date"):
-                try:
-                    default_date = datetime.strptime(
-                        str(existing_record.get("payment_date")), "%Y-%m-%d"
-                    ).date()
-                except:
-                    pass
+            with st.expander(f"📌 🗓️ {m_date} ｜ {m_title} (出席: {m_attendees}戶)"):
+                col_info, col_btn1, col_btn2 = st.columns([6, 1.5, 1.5])
+                with col_info:
+                    st.markdown(f"👥 **出席戶數：** `{m_attendees} 戶` ｜ ✍️ **紀錄人：** `{m_creator}`")
+                
+                if can_manage:
+                    with col_btn1:
+                        if st.session_state.edit_meeting_id == m_id:
+                            if st.button("❌ 取消", key=f"cancel_m_{m_id}"):
+                                st.session_state.edit_meeting_id = None
+                                st.rerun()
+                        else:
+                            if st.button("✏️ 編輯", key=f"edit_btn_m_{m_id}"):
+                                st.session_state.edit_meeting_id = m_id
+                                st.rerun()
+                    with col_btn2:
+                        if is_admin:
+                            if st.button("🗑️ 刪除", key=f"del_min_{m_id}"):
+                                supabase.table("meeting_minutes").delete().eq("id", m_id).execute()
+                                st.warning(f"已刪除會議紀錄：{m_title}")
+                                st.rerun()
 
-            # 簽收人與備註獨立抓取
-            default_signer = (
-                existing_record.get("notes", default_treasurer_signer)
-                if existing_record
-                else default_treasurer_signer
-            )
-            default_remarks = (
-                existing_record.get("remarks", "") if existing_record else ""
-            )
-            record_id = existing_record.get("id") if existing_record else None
+                st.markdown("---")
 
-            with col_u2:
-                if existing_record:
-                    st.info(
-                        f"ℹ️ 該住戶有資料，以下是自動帶入之內容，修改後送出即為更新。"
-                    )
+                if st.session_state.edit_meeting_id == m_id:
+                    st.info(f"✏️ 正在修改會議紀錄：**{m_title}**")
+                    with st.form(f"update_meeting_form_{m_id}"):
+                        up_title = st.text_input("會議標題", value=m_title)
+                        col_u1, col_u2 = st.columns(2)
+                        with col_u1:
+                            try:
+                                default_d = datetime.strptime(str(m_date), "%Y-%m-%d").date()
+                            except:
+                                default_d = date.today()
+                            up_date = st.date_input("會議日期", value=default_d)
+                        with col_u2:
+                            up_attendees = st.number_input("出席戶數/人數", min_value=0, value=int(m_attendees), step=1)
+
+                        up_content = st.text_area("會議紀錄內容 (支援 Markdown)", value=m_content, height=200)
+
+                        submit_update_m = st.form_submit_button("💾 儲存修改")
+                        if submit_update_m:
+                            payload_up = {
+                                "meeting_date": str(up_date),
+                                "title": up_title.strip(),
+                                "content": up_content.strip(),
+                                "attendees_count": int(up_attendees),
+                            }
+                            supabase.table("meeting_minutes").update(payload_up).eq("id", m_id).execute()
+                            st.session_state.edit_meeting_id = None
+                            st.success("✅ 會議紀錄更新成功！")
+                            st.rerun()
                 else:
-                    st.info(
-                        f"ℹ️ 無資料，注意現為新增功能，送出後將新增紀錄。"
-                    )
+                    st.markdown(m_content)
+    else:
+        st.info("目前尚無任何社區大會會議紀錄。")
 
-            with st.form("update_fee_form"):
-                status_options = ["已繳", "未繳"]
-                status_index = (
-                    status_options.index(default_status)
-                    if default_status in status_options
-                    else 0
+# ==========================================
+# 頁籤二：社區重要記事與活動歷程
+# ==========================================
+with tab_events:
+    st.subheader("📅 社區大小事與重要活動歷程紀錄")
+
+    # 新增記事表單
+    if can_manage:
+        with st.expander("✨ ➕ 【點此展開】新增社區重要記事/活動"):
+            with st.form("add_event_form"):
+                event_title = st.text_input(
+                    "記事/活動標題", placeholder="例如：收取2026年度公共費用"
                 )
-                pay_status = st.selectbox(
-                    "繳費狀態", status_options, index=status_index
+                
+                st.markdown("---")
+                st.markdown("⏱️ **起訖時間設定**")
+                
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
+                    st.markdown("**開始時間**")
+                    start_d = st.date_input("開始日期", value=date.today(), key="start_d")
+                    start_t = st.time_input("開始時間", value=time(9, 0), key="start_t")
+                with col_s2:
+                    st.markdown("**結束時間**")
+                    end_d = st.date_input("結束日期", value=date.today(), key="end_d")
+                    end_t = st.time_input("結束時間", value=time(18, 0), key="end_t")
+
+                st.markdown("---")
+                event_category = st.selectbox(
+                    "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"]
                 )
 
-                col_f1, col_f2, col_f3 = st.columns(3)
-                with col_f1:
-                    pay_amount = st.number_input(
-                        "付款金額 (元)", value=int(default_amount), step=100
-                    )
-                with col_f2:
-                    method_options = ["現金", "轉帳", "Line Pay", "其他"]
-                    method_index = (
-                        method_options.index(default_method)
-                        if default_method in method_options
-                        else 0
-                    )
-                    pay_method = st.selectbox(
-                        "付款方式", method_options, index=method_index
-                    )
-                with col_f3:
-                    pay_date = st.date_input("付款日期", value=default_date)
+                event_desc = st.text_area(
+                    "記事詳細說明",
+                    height=150,
+                    placeholder="請輸入該事件的詳細執行內容或結果...",
+                )
 
-                # 獨立的簽收人與備註輸入框
-                signer = st.text_input("簽收人", value=default_signer)
-                remarks = st.text_input("備註", value=default_remarks)
+                submit_event = st.form_submit_button("🚀 確認並儲存社區記事")
 
-                submit_fee = st.form_submit_button("儲存繳費紀錄")
-
-                if submit_fee:
-                    # 防呆檢查：若記錄不存在，且資料庫中已存在該年度該戶號的資料，則阻止新增避免重複
-                    if not record_id:
-                        latest_check = (
-                            supabase.table("fee_records")
-                            .select("id")
-                            .eq("unit_code", selected_target_unit)
-                            .eq("year", current_year_str)
-                            .execute()
-                        )
-                        if latest_check.data and len(latest_check.data) > 0:
-                            st.error(
-                                f"❌ 錯誤：戶號 `{selected_target_unit}` 在 {current_year_str} 年度已有繳費紀錄，每戶每年僅能有一筆資料，請直接修改現有資料！"
-                            )
-                            st.stop()
-
-                    payload = {
-                        "unit_code": selected_target_unit,
-                        "year": current_year_str,
-                        "status": pay_status,
-                        "amount": pay_amount,
-                        "payment_method": pay_method,
-                        "payment_date": str(pay_date),
-                        "notes": signer,  # 獨立儲存至 notes (簽收人)
-                        "remarks": remarks,  # 獨立儲存至 remarks (備註)
-                    }
-
-                    if record_id:
-                        supabase.table("fee_records").update(payload).eq(
-                            "id", record_id
-                        ).execute()
+                if submit_event:
+                    if not event_title.strip() or not event_desc.strip():
+                        st.error("❌ 記事標題與說明不得為空！")
                     else:
-                        supabase.table("fee_records").insert(payload).execute()
+                        start_datetime = datetime.combine(start_d, start_t)
+                        end_datetime = datetime.combine(end_d, end_t)
 
-                    st.success(
-                        f"已成功儲存戶號 `{selected_target_unit}` 的"
-                        f" {current_year_str} 年度繳費紀錄！"
-                    )
-                    st.rerun()
-else:
-    st.info(
-        f"🏠 您目前是以【住戶】身份登入 (戶號: {st.session_state.user_code})，僅顯示您"
-        f"個人的 {selected_year} 年繳費紀錄。"
+                        payload_e = {
+                            "start_time": str(start_datetime),
+                            "end_time": str(end_datetime),
+                            "title": event_title.strip(),
+                            "category": event_category,
+                            "description": event_desc.strip(),
+                            "creator_unit": st.session_state.user_code,
+                        }
+                        supabase.table("community_events").insert(payload_e).execute()
+                        st.success("🎉 社區記事已成功新增！")
+                        st.rerun()
+
+    # 讀取社區記事資料
+    events_raw = (
+        supabase.table("community_events")
+        .select("*")
+        .order("start_time", desc=True)
+        .execute()
+        .data
     )
 
-    my_fees = [
-        f
-        for f in all_fees_raw
-        if str(f.get("unit_code")) == str(st.session_state.user_code)
-        and str(f.get("year")) == str(selected_year)
-    ]
+    if events_raw:
+        years_list_e = sorted(
+            list(
+                set(
+                    [
+                        str(e["start_time"][:4])
+                        for e in events_raw
+                        if "start_time" in e
+                    ]
+                )
+            ),
+            reverse=True,
+        )
+        selected_year_e = st.selectbox("📅 選擇查看年度 (社區記事)", ["全部顯示"] + years_list_e, key="sel_year_e")
 
-    if my_fees:
-        df_my = format_fee_dataframe(my_fees)
-        st.dataframe(df_my, use_container_width=True)
+        filtered_events = events_raw
+        if selected_year_e != "全部顯示":
+            filtered_events = [
+                e
+                for e in events_raw
+                if str(e["start_time"]).startswith(selected_year_e)
+            ]
+
+        st.markdown("---")
+
+        if "edit_event_id" not in st.session_state:
+            st.session_state.edit_event_id = None
+
+        for e in filtered_events:
+            e_id = e.get("id")
+            e_title = e.get("title")
+            e_start = str(e.get("start_time", "")).replace("T", " ")
+            e_end = str(e.get("end_time", "")).replace("T", " ") if e.get("end_time") else ""
+            e_cat = e.get("category", "一般記事")
+            e_desc = e.get("description", "")
+            e_creator = e.get("creator_unit", "")
+
+            time_display = e_start
+            if e_end:
+                time_display = f"{e_start} ～ {e_end}"
+
+            expander_title = f"✨ 【{e_cat}】 {e_title}"
+
+            with st.expander(expander_title):
+                col_einfo, col_ebtn1, col_ebtn2 = st.columns([6, 1.5, 1.5])
+                with col_einfo:
+                    st.markdown(
+                        f"⏱️ **期間：** `{time_display}` ｜ ✍️ **紀錄人：** `{e_creator}`",
+                        unsafe_allow_html=True
+                    )
+                
+                if can_manage:
+                    with col_ebtn1:
+                        if st.session_state.edit_event_id == e_id:
+                            if st.button("❌ 取消", key=f"cancel_e_{e_id}"):
+                                st.session_state.edit_event_id = None
+                                st.rerun()
+                        else:
+                            if st.button("✏️ 編輯", key=f"edit_btn_e_{e_id}"):
+                                st.session_state.edit_event_id = e_id
+                                st.rerun()
+                    with col_ebtn2:
+                        if is_admin:
+                            if st.button("🗑️ 刪除", key=f"del_ev_{e_id}"):
+                                supabase.table("community_events").delete().eq("id", e_id).execute()
+                                st.warning(f"已刪除記事：{e_title}")
+                                st.rerun()
+
+                st.markdown("---")
+
+                if st.session_state.edit_event_id == e_id:
+                    st.info(f"✏️ 正在修改記事：**{e_title}**")
+                    with st.form(f"update_event_form_{e_id}"):
+                        up_e_title = st.text_input("記事/活動標題", value=e_title)
+                        
+                        try:
+                            dt_start = datetime.strptime(str(e_start), "%Y-%m-%d %H:%M:%S")
+                        except:
+                            dt_start = datetime.now()
+
+                        dt_end = None
+                        if e_end:
+                            try:
+                                dt_end = datetime.strptime(str(e_end), "%Y-%m-%d %H:%M:%S")
+                            except:
+                                pass
+
+                        col_us1, col_us2 = st.columns(2)
+                        with col_us1:
+                            up_start_d = st.date_input("開始日期", value=dt_start.date(), key=f"up_sd_{e_id}")
+                            up_start_t = st.time_input("開始時間", value=dt_start.time(), key=f"up_st_{e_id}")
+                        with col_us2:
+                            up_end_d = st.date_input("結束日期", value=dt_end.date() if dt_end else date.today(), key=f"up_ed_{e_id}")
+                            up_end_t = st.time_input("結束時間", value=dt_end.time() if dt_end else time(18, 0), key=f"up_et_{e_id}")
+
+                        up_category = st.selectbox(
+                            "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"],
+                            index=["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"].index(e_cat) if e_cat in ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"] else 0
+                        )
+
+                        up_desc = st.text_area("記事詳細說明", value=e_desc, height=150)
+
+                        submit_update_e = st.form_submit_button("💾 儲存修改")
+                        if submit_update_e:
+                            up_start_dt = datetime.combine(up_start_d, up_start_t)
+                            up_end_dt = datetime.combine(up_end_d, up_end_t)
+
+                            payload_up_e = {
+                                "start_time": str(up_start_dt),
+                                "end_time": str(up_end_dt),
+                                "title": up_e_title.strip(),
+                                "category": up_category,
+                                "description": up_desc.strip(),
+                            }
+                            supabase.table("community_events").update(payload_up_e).eq("id", e_id).execute()
+                            st.session_state.edit_event_id = None
+                            st.success("✅ 社區記事更新成功！")
+                            st.rerun()
+                else:
+                    st.write(e_desc)
     else:
-        st.info(f"查無您的 {selected_year} 年度繳費紀錄，或管理員尚未登錄。")
+        st.info("目前尚無任何社區重要記事記錄。")
