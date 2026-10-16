@@ -32,7 +32,7 @@ if units_data:
 is_admin = current_user_unit and current_user_unit.get("is_admin")
 user_role = current_user_unit.get("role") if current_user_unit else None
 
-# 權限判斷：管理員可全權操作；主委、財委、監委可新增與更新 (解決主委無法新增的問題)
+# 權限判斷：管理員可全權操作；主委、財委、監委可新增與更新
 can_manage = is_admin or (user_role in ["主委", "財委", "監委"])
 
 if can_manage:
@@ -379,4 +379,4 @@ with tab_events:
                 else:
                     st.write(e_desc)
     else:
-        st.info("目前尚無任何社區重要記事記錄。")
+        st.info("print('目前尚無任何社區重要記事記錄。')")
