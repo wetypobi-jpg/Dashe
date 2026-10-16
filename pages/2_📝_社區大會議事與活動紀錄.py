@@ -50,7 +50,7 @@ tab_minutes, tab_events = st.tabs(["📋 社區大會會議紀錄", "📅 社區
 with tab_minutes:
     st.subheader("📋 歷次社區大會會議紀錄與決議")
 
-    # 新增會議紀錄表單 (管理/主委/財委/監委專用)
+    # 新增會議紀錄表單
     if can_manage:
         with st.expander("➕ 【點此展開】新增或發布新的社區大會會議紀錄"):
             with st.form("add_meeting_form"):
@@ -121,7 +121,10 @@ with tab_minutes:
             ]
 
         st.markdown("---")
-        st.write("💡 **點擊下方各場會議卡片可展開或收合詳細內容：**")
+        
+        # 初始化 Session State 紀錄目前編輯中的會議 ID
+        if "edit_meeting_id" not in st.session_state:
+            st.session_state.edit_meeting_id = None
 
         for m in filtered_minutes:
             m_id = m.get("id")
@@ -131,21 +134,60 @@ with tab_minutes:
             m_creator = m.get("creator_unit", "")
             m_content = m.get("content", "")
 
-            # 使用收合卡片 (expander) 呈現每一筆會議紀錄，乾淨且一次可以控制收合
-            with st.expander(f"📌 [{m_date}] {m_title} (出席: {m_attendees}戶)"):
-                st.caption(
-                    f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人（戶號）：**{m_creator}**"
-                )
-                st.markdown("---")
-                st.markdown(m_content)
+            with st.container(border=True):
+                col_h1, col_h2 = st.columns([5, 1])
+                with col_h1:
+                    st.markdown(f"### 📌 {m_date} ｜ {m_title}")
+                    st.caption(f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人：`{m_creator}`")
+                with col_h2:
+                    if can_manage:
+                        if st.session_state.edit_meeting_id == m_id:
+                            if st.button("❌ 取消", key=f"cancel_m_{m_id}"):
+                                st.session_state.edit_meeting_id = None
+                                st.rerun()
+                        else:
+                            if st.button("✏️ 更新", key=f"edit_btn_m_{m_id}"):
+                                st.session_state.edit_meeting_id = m_id
+                                st.rerun()
 
-                # 管理員可刪除
-                if is_admin:
+                # 若點擊了該筆的更新按鈕，則在下方展開編輯表單
+                if st.session_state.edit_meeting_id == m_id:
                     st.markdown("---")
-                    if st.button(f"🗑️ 刪除此筆會議紀錄", key=f"del_min_{m_id}" ):
-                        supabase.table("meeting_minutes").delete().eq(
-                            "id", m_id
-                        ).execute()
+                    st.info(f"✏️ 正在修改會議紀錄：**{m_title}**")
+                    with st.form(f"update_meeting_form_{m_id}"):
+                        up_title = st.text_input("會議標題", value=m_title)
+                        col_u1, col_u2 = st.columns(2)
+                        with col_u1:
+                            try:
+                                default_d = datetime.strptime(str(m_date), "%Y-%m-%d").date()
+                            except:
+                                default_d = date.today()
+                            up_date = st.date_input("會議日期", value=default_d)
+                        with col_u2:
+                            up_attendees = st.number_input("出席戶數/人數", min_value=0, value=int(m_attendees), step=1)
+
+                        up_content = st.text_area("會議紀錄內容 (支援 Markdown)", value=m_content, height=200)
+
+                        submit_update_m = st.form_submit_button("💾 儲存修改")
+                        if submit_update_m:
+                            payload_up = {
+                                "meeting_date": str(up_date),
+                                "title": up_title.strip(),
+                                "content": up_content.strip(),
+                                "attendees_count": int(up_attendees),
+                            }
+                            supabase.table("meeting_minutes").update(payload_up).eq("id", m_id).execute()
+                            st.session_state.edit_meeting_id = None
+                            st.success("✅ 會議紀錄更新成功！")
+                            st.rerun()
+                else:
+                    with st.expander("📄 點此展開閱讀會議詳細內容"):
+                        st.markdown(m_content)
+
+                # 刪除按鈕 (僅管理員)
+                if is_admin:
+                    if st.button(f"🗑️ 刪除此筆紀錄", key=f"del_min_{m_id}"):
+                        supabase.table("meeting_minutes").delete().eq("id", m_id).execute()
                         st.warning(f"已刪除會議紀錄：{m_title}")
                         st.rerun()
     else:
@@ -157,7 +199,7 @@ with tab_minutes:
 with tab_events:
     st.subheader("📅 社區大小事與重要活動歷程紀錄")
 
-    # 新增記事表單 (管理/主委/財委/監委專用)
+    # 新增記事表單
     if can_manage:
         with st.expander("➕ 【點此展開】新增社區重要記事/活動"):
             with st.form("add_event_form"):
@@ -243,7 +285,10 @@ with tab_events:
             ]
 
         st.markdown("---")
-        st.write("💡 **點擊下方各筆活動紀錄卡片可展開或收合詳細內容：**")
+
+        # 初始化 Session State 紀錄目前編輯中的記事 ID
+        if "edit_event_id" not in st.session_state:
+            st.session_state.edit_event_id = None
 
         for e in filtered_events:
             e_id = e.get("id")
@@ -259,19 +304,80 @@ with tab_events:
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            # 使用收合卡片 (expander) 呈現每一筆記事，乾淨清爽
-            with st.expander(f"🔹 【{e_cat}】{e_title} ({e_start[:10]})"):
-                st.caption(f"⏱️ 期間：`{time_display}` ｜ ✍️ 紀錄人（戶號）：**{e_creator}**")
-                st.markdown("---")
-                st.write(e_desc)
+            with st.container(border=True):
+                col_eh1, col_eh2 = st.columns([5, 1])
+                with col_eh1:
+                    st.markdown(f"### 🔹 【{e_cat}】 {e_title}")
+                    st.caption(f"⏱️ 期間：`{time_display}` ｜ ✍️ 紀錄人：`{e_creator}`")
+                with col_eh2:
+                    if can_manage:
+                        if st.session_state.edit_event_id == e_id:
+                            if st.button("❌ 取消", key=f"cancel_e_{e_id}"):
+                                st.session_state.edit_event_id = None
+                                st.rerun()
+                        else:
+                            if st.button("✏️ 更新", key=f"edit_btn_e_{e_id}"):
+                                st.session_state.edit_event_id = e_id
+                                st.rerun()
 
-                # 管理員可刪除
-                if is_admin:
+                # 若點擊了該筆的更新按鈕，則展開編輯表單
+                if st.session_state.edit_event_id == e_id:
                     st.markdown("---")
+                    st.info(f"✏️ 正在修改記事：**{e_title}**")
+                    with st.form(f"update_event_form_{e_id}"):
+                        up_e_title = st.text_input("記事/活動標題", value=e_title)
+                        
+                        try:
+                            dt_start = datetime.strptime(str(e_start), "%Y-%m-%d %H:%M:%S")
+                        except:
+                            dt_start = datetime.now()
+
+                        dt_end = None
+                        if e_end:
+                            try:
+                                dt_end = datetime.strptime(str(e_end), "%Y-%m-%d %H:%M:%S")
+                            except:
+                                pass
+
+                        col_us1, col_us2 = st.columns(2)
+                        with col_us1:
+                            up_start_d = st.date_input("開始日期", value=dt_start.date(), key=f"up_sd_{e_id}")
+                            up_start_t = st.time_input("開始時間", value=dt_start.time(), key=f"up_st_{e_id}")
+                        with col_us2:
+                            up_end_d = st.date_input("結束日期", value=dt_end.date() if dt_end else date.today(), key=f"up_ed_{e_id}")
+                            up_end_t = st.time_input("結束時間", value=dt_end.time() if dt_end else time(18, 0), key=f"up_et_{e_id}")
+
+                        up_category = st.selectbox(
+                            "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"],
+                            index=["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"].index(e_cat) if e_cat in ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"] else 0
+                        )
+
+                        up_desc = st.text_area("記事詳細說明", value=e_desc, height=150)
+
+                        submit_update_e = st.form_submit_button("💾 儲存修改")
+                        if submit_update_e:
+                            up_start_dt = datetime.combine(up_start_d, up_start_t)
+                            up_end_dt = datetime.combine(up_end_d, up_end_t)
+
+                            payload_up_e = {
+                                "start_time": str(up_start_dt),
+                                "end_time": str(up_end_dt),
+                                "title": up_e_title.strip(),
+                                "category": up_category,
+                                "description": up_desc.strip(),
+                            }
+                            supabase.table("community_events").update(payload_up_e).eq("id", e_id).execute()
+                            st.session_state.edit_event_id = None
+                            st.success("✅ 社區記事更新成功！")
+                            st.rerun()
+                else:
+                    with st.expander("📄 點此展開閱讀詳細說明"):
+                        st.write(e_desc)
+
+                # 刪除按鈕 (僅管理員)
+                if is_admin:
                     if st.button(f"🗑️ 刪除此筆記事", key=f"del_ev_{e_id}"):
-                        supabase.table("community_events").delete().eq(
-                            "id", e_id
-                        ).execute()
+                        supabase.table("community_events").delete().eq("id", e_id).execute()
                         st.warning(f"已刪除記事：{e_title}")
                         st.rerun()
     else:
