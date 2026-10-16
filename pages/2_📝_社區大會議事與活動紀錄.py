@@ -50,8 +50,9 @@ tab_minutes, tab_events = st.tabs(["📋 社區大會會議紀錄", "📅 社區
 with tab_minutes:
     st.subheader("📋 歷次社區大會會議紀錄與決議")
 
+    # 新增會議紀錄表單 (管理/主委/財委/監委專用)
     if can_manage:
-        with st.expander("➕ 點此展開表單：新增或發布新的社區大會會議紀錄"):
+        with st.expander("➕ 【點此展開】新增或發布新的社區大會會議紀錄"):
             with st.form("add_meeting_form"):
                 new_title = st.text_input(
                     "會議標題", placeholder="例如：2026年度第一次區分所有權人會議"
@@ -70,7 +71,7 @@ with tab_minutes:
                     placeholder="請輸入討論事項、決議結果及交辦事項...",
                 )
 
-                submit_minute = st.form_submit_button("📢 發布會議紀錄")
+                submit_minute = st.form_submit_button("📢 確認並發布會議紀錄")
 
                 if submit_minute:
                     if not new_title.strip() or not new_content.strip():
@@ -119,6 +120,9 @@ with tab_minutes:
                 if str(m["meeting_date"]).startswith(selected_year_m)
             ]
 
+        st.markdown("---")
+        st.write("💡 **點擊下方各場會議卡片可展開或收合詳細內容：**")
+
         for m in filtered_minutes:
             m_id = m.get("id")
             m_title = m.get("title")
@@ -127,28 +131,23 @@ with tab_minutes:
             m_creator = m.get("creator_unit", "")
             m_content = m.get("content", "")
 
-            # 使用卡片外觀包裝每一筆紀錄
-            with st.container(border=True):
-                st.markdown(f"### 📌 {m_date}｜{m_title}")
+            # 使用收合卡片 (expander) 呈現每一筆會議紀錄，乾淨且一次可以控制收合
+            with st.expander(f"📌 [{m_date}] {m_title} (出席: {m_attendees}戶)"):
                 st.caption(
                     f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人（戶號）：**{m_creator}**"
                 )
                 st.markdown("---")
                 st.markdown(m_content)
 
-                if can_manage:
-                    st.markdown("")
-                    col_del1, col_del2 = st.columns([6, 1])
-                    with col_del2:
-                        if is_admin:
-                            if st.button(
-                                f"🗑️ 刪除", key=f"del_min_{m_id}", use_container_width=True
-                            ):
-                                supabase.table("meeting_minutes").delete().eq(
-                                    "id", m_id
-                                ).execute()
-                                st.warning(f"已刪除會議紀錄：{m_title}")
-                                st.rerun()
+                # 管理員可刪除
+                if is_admin:
+                    st.markdown("---")
+                    if st.button(f"🗑️ 刪除此筆會議紀錄", key=f"del_min_{m_id}" ):
+                        supabase.table("meeting_minutes").delete().eq(
+                            "id", m_id
+                        ).execute()
+                        st.warning(f"已刪除會議紀錄：{m_title}")
+                        st.rerun()
     else:
         st.info("目前尚無任何社區大會會議紀錄。")
 
@@ -157,10 +156,10 @@ with tab_minutes:
 # ==========================================
 with tab_events:
     st.subheader("📅 社區大小事與重要活動歷程紀錄")
-    st.markdown("供住戶與管理團隊查閱各期間所執行的重大事項（含精確起訖時間）。")
 
+    # 新增記事表單 (管理/主委/財委/監委專用)
     if can_manage:
-        with st.expander("➕ 點此展開表單：新增社區重要記事/活動"):
+        with st.expander("➕ 【點此展開】新增社區重要記事/活動"):
             with st.form("add_event_form"):
                 event_title = st.text_input(
                     "記事/活動標題", placeholder="例如：收取2026年度公共費用"
@@ -190,7 +189,7 @@ with tab_events:
                     placeholder="請輸入該事件的詳細執行內容或結果...",
                 )
 
-                submit_event = st.form_submit_button("💾 儲存社區記事")
+                submit_event = st.form_submit_button("💾 確認並儲存社區記事")
 
                 if submit_event:
                     if not event_title.strip() or not event_desc.strip():
@@ -243,6 +242,9 @@ with tab_events:
                 if str(e["start_time"]).startswith(selected_year_e)
             ]
 
+        st.markdown("---")
+        st.write("💡 **點擊下方各筆活動紀錄卡片可展開或收合詳細內容：**")
+
         for e in filtered_events:
             e_id = e.get("id")
             e_title = e.get("title")
@@ -257,25 +259,20 @@ with tab_events:
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            # 使用卡片外觀包裝每一筆活動紀錄
-            with st.container(border=True):
-                st.markdown(f"### 🔹 【{e_cat}】{e_title}")
+            # 使用收合卡片 (expander) 呈現每一筆記事，乾淨清爽
+            with st.expander(f"🔹 【{e_cat}】{e_title} ({e_start[:10]})"):
                 st.caption(f"⏱️ 期間：`{time_display}` ｜ ✍️ 紀錄人（戶號）：**{e_creator}**")
                 st.markdown("---")
                 st.write(e_desc)
 
-                if can_manage:
-                    st.markdown("")
-                    col_del1, col_del2 = st.columns([6, 1])
-                    with col_del2:
-                        if is_admin:
-                            if st.button(
-                                f"🗑️ 刪除", key=f"del_ev_{e_id}", use_container_width=True
-                            ):
-                                supabase.table("community_events").delete().eq(
-                                    "id", e_id
-                                ).execute()
-                                st.warning(f"已刪除記事：{e_title}")
-                                st.rerun()
+                # 管理員可刪除
+                if is_admin:
+                    st.markdown("---")
+                    if st.button(f"🗑️ 刪除此筆記事", key=f"del_ev_{e_id}"):
+                        supabase.table("community_events").delete().eq(
+                            "id", e_id
+                        ).execute()
+                        st.warning(f"已刪除記事：{e_title}")
+                        st.rerun()
     else:
         st.info("目前尚無任何社區重要記事記錄。")
