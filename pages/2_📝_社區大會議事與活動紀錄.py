@@ -122,7 +122,6 @@ with tab_minutes:
 
         st.markdown("---")
         
-        # 初始化 Session State 紀錄目前編輯中的會議 ID
         if "edit_meeting_id" not in st.session_state:
             st.session_state.edit_meeting_id = None
 
@@ -138,7 +137,8 @@ with tab_minutes:
                 col_h1, col_h2 = st.columns([5, 1])
                 with col_h1:
                     st.markdown(f"### 📌 {m_date} ｜ {m_title}")
-                    st.caption(f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人：`{m_creator}`")
+                    # 字體放大
+                    st.markdown(f"#### 👥 出席戶數：{m_attendees} 戶 ｜ ✍️ 紀錄人：`{m_creator}`")
                 with col_h2:
                     if can_manage:
                         if st.session_state.edit_meeting_id == m_id:
@@ -150,7 +150,6 @@ with tab_minutes:
                                 st.session_state.edit_meeting_id = m_id
                                 st.rerun()
 
-                # 若點擊了該筆的更新按鈕，則在下方展開編輯表單
                 if st.session_state.edit_meeting_id == m_id:
                     st.markdown("---")
                     st.info(f"✏️ 正在修改會議紀錄：**{m_title}**")
@@ -184,7 +183,6 @@ with tab_minutes:
                     with st.expander("📄 點此展開閱讀會議詳細內容"):
                         st.markdown(m_content)
 
-                # 刪除按鈕 (僅管理員)
                 if is_admin:
                     if st.button(f"🗑️ 刪除此筆紀錄", key=f"del_min_{m_id}"):
                         supabase.table("meeting_minutes").delete().eq("id", m_id).execute()
@@ -286,20 +284,19 @@ with tab_events:
 
         st.markdown("---")
 
-        # 初始化 Session State 紀錄目前編輯中的記事 ID
         if "edit_event_id" not in st.session_state:
             st.session_state.edit_event_id = None
 
         for e in filtered_events:
             e_id = e.get("id")
             e_title = e.get("title")
-            e_start = e.get("start_time")
-            e_end = e.get("end_time")
+            e_start = str(e.get("start_time", "")).replace("T", " ")
+            e_end = str(e.get("end_time", "")).replace("T", " ") if e.get("end_time") else ""
             e_cat = e.get("category", "一般記事")
             e_desc = e.get("description", "")
             e_creator = e.get("creator_unit", "")
 
-            # 組合日期時間顯示格式
+            # 組合日期時間顯示格式（去掉 T）
             time_display = e_start
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
@@ -308,7 +305,8 @@ with tab_events:
                 col_eh1, col_eh2 = st.columns([5, 1])
                 with col_eh1:
                     st.markdown(f"### 🔹 【{e_cat}】 {e_title}")
-                    st.caption(f"⏱️ 期間：`{time_display}` ｜ ✍️ 紀錄人：`{e_creator}`")
+                    # 字體放大
+                    st.markdown(f"#### ⏱️ 期間：{time_display}\n#### ✍️ 紀錄人：`{e_creator}`")
                 with col_eh2:
                     if can_manage:
                         if st.session_state.edit_event_id == e_id:
@@ -320,7 +318,6 @@ with tab_events:
                                 st.session_state.edit_event_id = e_id
                                 st.rerun()
 
-                # 若點擊了該筆的更新按鈕，則展開編輯表單
                 if st.session_state.edit_event_id == e_id:
                     st.markdown("---")
                     st.info(f"✏️ 正在修改記事：**{e_title}**")
@@ -328,14 +325,14 @@ with tab_events:
                         up_e_title = st.text_input("記事/活動標題", value=e_title)
                         
                         try:
-                            dt_start = datetime.strptime(str(e_start), "%Y-%m-%d %H:%M:%S")
+                            dt_start = datetime.strptime(str(e.get("start_time")), "%Y-%m-%d %H:%M:%S")
                         except:
                             dt_start = datetime.now()
 
                         dt_end = None
-                        if e_end:
+                        if e.get("end_time"):
                             try:
-                                dt_end = datetime.strptime(str(e_end), "%Y-%m-%d %H:%M:%S")
+                                dt_end = datetime.strptime(str(e.get("end_time")), "%Y-%m-%d %H:%M:%S")
                             except:
                                 pass
 
@@ -374,7 +371,6 @@ with tab_events:
                     with st.expander("📄 點此展開閱讀詳細說明"):
                         st.write(e_desc)
 
-                # 刪除按鈕 (僅管理員)
                 if is_admin:
                     if st.button(f"🗑️ 刪除此筆記事", key=f"del_ev_{e_id}"):
                         supabase.table("community_events").delete().eq("id", e_id).execute()
