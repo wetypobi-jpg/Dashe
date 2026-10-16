@@ -133,8 +133,8 @@ with tab_minutes:
             m_creator = m.get("creator_unit", "")
             m_content = m.get("content", "")
 
+            # 使用 HTML 放大標題字體，並整張卡片收合
             with st.expander(f"📌 [{m_date}] {m_title} (出席: {m_attendees}戶)"):
-                # 將資訊與按鈕放在同一行 (右上角)
                 col_info, col_btn1, col_btn2 = st.columns([6, 1.5, 1.5])
                 with col_info:
                     st.caption(f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人：`{m_creator}`")
@@ -300,7 +300,10 @@ with tab_events:
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            with st.expander(f"🔹 【{e_cat}】 {e_title}"):
+            # 透過 HTML 讓標題字體明顯放大 (font-size: 18px)
+            expander_title = f"<span style='font-size: 18px; font-weight: bold;'>🔹 【{e_cat}】 {e_title}</span>"
+
+            with st.expander(expander_title):
                 # 將期間資訊與右上角按鈕放置在同一行
                 col_einfo, col_ebtn1, col_ebtn2 = st.columns([6, 1.5, 1.5])
                 with col_einfo:
