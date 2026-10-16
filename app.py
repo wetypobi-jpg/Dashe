@@ -16,12 +16,12 @@ st.set_page_config(
     page_title="吾映良品柒 - 社區管理系統", page_icon="🏢", layout="wide"
 )
 
-# 初始化登入狀態 (包含 is_admin 與 is_treasurer)
+# 初始化登入狀態 (包含 is_admin 與 role，已移除 is_treasurer)
 if "logged_in" not in st.session_state:
   st.session_state.logged_in = False
   st.session_state.user_code = ""
   st.session_state.is_admin = False
-  st.session_state.is_treasurer = False
+  st.session_state.role = None
 
 # ==========================================
 # 未登入狀態：顯示登入與更改密碼畫面
@@ -73,9 +73,8 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.user_code = clean_unit
             st.session_state.is_admin = bool(matched_user.get("is_admin"))
-            st.session_state.is_treasurer = bool(
-                matched_user.get("is_treasurer")
-            )
+            # 完整抓取資料庫中的 role 資訊 (例如 '主委', '財委', '監委' 或 None)
+            st.session_state.role = matched_user.get("role")
             st.success("登入成功！載入中...")
             st.rerun()
           else:
@@ -115,8 +114,8 @@ st.sidebar.title("🏢 吾映良品柒")
 role_badge = ""
 if st.session_state.is_admin:
   role_badge = "(管理員)"
-elif st.session_state.is_treasurer:
-  role_badge = "(財務委員)"
+elif st.session_state.role:
+  role_badge = f"({st.session_state.role})"
 else:
   role_badge = "(住戶)"
 
@@ -127,7 +126,7 @@ if st.sidebar.button("🚪 登出系統", use_container_width=True):
   st.session_state.logged_in = False
   st.session_state.user_code = ""
   st.session_state.is_admin = False
-  st.session_state.is_treasurer = False
+  st.session_state.role = None
   st.rerun()
 
 st.title("🏢 吾映良品柒社區管理系統")
