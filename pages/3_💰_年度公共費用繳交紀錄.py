@@ -61,7 +61,7 @@ if current_user_unit and current_user_unit.get("role") == "財委":
 
 has_management_rights = (
     (current_user_unit and current_user_unit.get("is_admin"))
-    or (current_user_unit and current_user_unit.get("role") == "財委")
+    or (current_user_unit and current_user_unit.get("role") in ["主委", "財委", "監委"]
     or is_current_treasurer
 )
 
