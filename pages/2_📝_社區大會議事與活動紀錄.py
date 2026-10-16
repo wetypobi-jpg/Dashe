@@ -125,7 +125,7 @@ with tab_minutes:
             with st.container():
                 st.markdown(f"#### 📌 {m_date}｜{m_title}")
                 st.caption(
-                    f"👥 出席戶數：{m_attendees} 戶 ｜ ✍️ 記錄人（戶號）：{m_creator}"
+                    f"👥 出席戶數：{m_attendees} 戶 ｜ ✍️ 紀錄人（戶號）：{m_creator}"
                 )
                 st.markdown(m_content)
 
@@ -156,17 +156,27 @@ with tab_events:
                     "記事/活動標題", placeholder="例如：收取2026年度公共費用"
                 )
                 
-                col_e1, col_e2 = st.columns(2)
-                with col_e1:
-                    st.markdown("**開始時間**")
+                st.markdown("---")
+                st.markdown("⏱️ **時間設定**")
+                
+                # 採用上下兩行或明確左右欄位配置，避免勾選時元件跑版
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
                     start_d = st.date_input("開始日期", value=date.today(), key="start_d")
+                with col_s2:
                     start_t = st.time_input("開始時間", value=time(9, 0), key="start_t")
-                with col_e2:
-                    st.markdown("**結束時間 (選填區間)**")
-                    has_end = st.checkbox("啟用結束時間區間", value=False)
-                    end_d = st.date_input("結束日期", value=date.today(), key="end_d") if has_end else None
-                    end_t = st.time_input("結束時間", value=time(18, 0), key="end_t") if has_end else None
 
+                has_end = st.checkbox("啟用結束日期與時間區間 (選填)", value=False, key="has_end_checkbox")
+                
+                end_d, end_t = None, None
+                if has_end:
+                    col_e1, col_e2 = st.columns(2)
+                    with col_e1:
+                        end_d = st.date_input("結束日期", value=date.today(), key="end_d")
+                    with col_e2:
+                        end_t = st.time_input("結束時間", value=time(18, 0), key="end_t")
+
+                st.markdown("---")
                 event_category = st.selectbox(
                     "類別", ["一般記事", "財務收費", "委員決議", "修繕維護", "交接事項"]
                 )
