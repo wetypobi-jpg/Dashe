@@ -136,7 +136,6 @@ with tab_minutes:
             # 整張卡片改用 expander 包覆收合
             with st.expander(f"📌 [{m_date}] {m_title} (出席: {m_attendees}戶)"):
                 st.caption(f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人：`{m_creator}`")
-                st.markdown("---")
 
                 if can_manage:
                     col_b1, col_b2 = st.columns([1, 1])
