@@ -17,7 +17,7 @@ if (
     st.stop()
 
 st.title("📝 吾映良品柒社區 - 議事與活動紀錄")
-st.markdown("在這裡您可以查閱社區大會會議紀錄，以及歷年來社區所做的大小重要記事與活動歷程。")
+st.markdown("✨ 記錄社區的大小事、重要會議與精采歷程，讓美好回憶與重要決議有跡可循！")
 st.markdown("---")
 
 # 取得當前使用者身分與權限
@@ -52,7 +52,7 @@ with tab_minutes:
 
     # 新增會議紀錄表單
     if can_manage:
-        with st.expander("➕ 【點此展開】新增或發布新的社區大會會議紀錄"):
+        with st.expander("✨ ➕ 【點此展開】新增或發布新的社區大會會議紀錄"):
             with st.form("add_meeting_form"):
                 new_title = st.text_input(
                     "會議標題", placeholder="例如：2026年度第一次區分所有權人會議"
@@ -71,7 +71,7 @@ with tab_minutes:
                     placeholder="請輸入討論事項、決議結果及交辦事項...",
                 )
 
-                submit_minute = st.form_submit_button("📢 確認並發布會議紀錄")
+                submit_minute = st.form_submit_button("🚀 確認並發布會議紀錄")
 
                 if submit_minute:
                     if not new_title.strip() or not new_content.strip():
@@ -133,11 +133,10 @@ with tab_minutes:
             m_creator = m.get("creator_unit", "")
             m_content = m.get("content", "")
 
-            # 使用 HTML 放大標題字體，並整張卡片收合
-            with st.expander(f"📌 [{m_date}] {m_title} (出席: {m_attendees}戶)"):
+            with st.expander(f"📌 🗓️ {m_date} ｜ {m_title} (出席: {m_attendees}戶)"):
                 col_info, col_btn1, col_btn2 = st.columns([6, 1.5, 1.5])
                 with col_info:
-                    st.caption(f"👥 出席戶數：**{m_attendees} 戶** ｜ ✍️ 紀錄人：`{m_creator}`")
+                    st.markdown(f"👥 **出席戶數：** `{m_attendees} 戶` ｜ ✍️ **紀錄人：** `{m_creator}`")
                 
                 if can_manage:
                     with col_btn1:
@@ -199,7 +198,7 @@ with tab_events:
 
     # 新增記事表單
     if can_manage:
-        with st.expander("➕ 【點此展開】新增社區重要記事/活動"):
+        with st.expander("✨ ➕ 【點此展開】新增社區重要記事/活動"):
             with st.form("add_event_form"):
                 event_title = st.text_input(
                     "記事/活動標題", placeholder="例如：收取2026年度公共費用"
@@ -229,7 +228,7 @@ with tab_events:
                     placeholder="請輸入該事件的詳細執行內容或結果...",
                 )
 
-                submit_event = st.form_submit_button("💾 確認並儲存社區記事")
+                submit_event = st.form_submit_button("🚀 確認並儲存社區記事")
 
                 if submit_event:
                     if not event_title.strip() or not event_desc.strip():
@@ -300,15 +299,15 @@ with tab_events:
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            # 透過 HTML 讓標題字體明顯放大 (font-size: 18px)
-            expander_title = f"<span style='font-size: 18px; font-weight: bold;'>🔹 【{e_cat}】 {e_title}</span>"
+            # 活潑且大器的卡片標題設計
+            expander_title = f"✨ 【{e_cat}】 {e_title}"
 
             with st.expander(expander_title):
                 # 將期間資訊與右上角按鈕放置在同一行
                 col_einfo, col_ebtn1, col_ebtn2 = st.columns([6, 1.5, 1.5])
                 with col_einfo:
                     st.markdown(
-                        f"<p style='font-size: 15px; font-weight: bold; margin: 0;'>⏱️ 期間：{time_display} ｜ ✍️ 紀錄人：{e_creator}</p>",
+                        f"⏱️ **期間：** `{time_display}` ｜ ✍️ **紀錄人：** `{e_creator}`",
                         unsafe_allow_html=True
                     )
                 
