@@ -155,7 +155,7 @@ with tab_minutes:
                                 st.warning(f"已刪除會議紀錄：{m_title}")
                                 st.rerun()
 
-                #st.markdown("---")
+                st.markdown("---")
 
                 if st.session_state.edit_meeting_id == m_id:
                     st.info(f"✏️ 正在修改會議紀錄：**{m_title}**")
@@ -277,7 +277,6 @@ with tab_events:
                 if str(e["start_time"]).startswith(selected_year_e)
             ]
 
-
         if "edit_event_id" not in st.session_state:
             st.session_state.edit_event_id = None
 
@@ -289,16 +288,19 @@ with tab_events:
             e_cat = e.get("category", "一般記事")
             e_desc = e.get("description", "")
             e_creator = e.get("creator_unit", "")
+            
+            # 取得建立時間 (created_time)，若無則預設為空字串並格式化
+            e_created = str(e.get("created_time", "")).replace("T", " ")[:19] if e.get("created_time") else ""
 
             time_display = e_start
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            # 活潑且大器的卡片標題設計
-            expander_title = f"✨ 【{e_cat}】 {e_title}"
+            # 小卡收合時標題右側顯示 created_time
+            created_html = f"<span style='float: right; font-size: 13px; color: gray; font-weight: normal;'>發布時間: {e_created}</span>" if e_created else ""
+            expander_title = f"✨ 【{e_cat}】 {e_title} {created_html}"
 
             with st.expander(expander_title):
-                # 將期間資訊與右上角按鈕放置在同一行
                 col_einfo, col_ebtn1, col_ebtn2 = st.columns([6, 1.5, 1.5])
                 with col_einfo:
                     st.markdown(
