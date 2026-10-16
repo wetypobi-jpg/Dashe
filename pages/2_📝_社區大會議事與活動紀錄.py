@@ -16,6 +16,20 @@ if (
     st.warning("⚠️ 請先至首頁登入系統！")
     st.stop()
 
+# 注入 CSS 讓 expander 標題內的發布時間靠右對齊
+st.markdown("""
+<style>
+/* 針對 expander 標題右側的時間標籤進行 CSS 靠右微調 */
+.expander-right-time {
+    float: right;
+    font-size: 13px;
+    color: gray;
+    font-weight: normal;
+    margin-right: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📝 吾映良品柒社區 - 議事與活動紀錄")
 st.markdown("✨ 記錄社區的大小事、重要會議與精采歷程，讓美好回憶與重要決議有跡可循！")
 st.markdown("---")
@@ -296,16 +310,11 @@ with tab_events:
             if e_end:
                 time_display = f"{e_start} ～ {e_end}"
 
-            # 修正：將 expander 標題改為乾淨文字，並透過內部 HTML 區塊完美呈現右側發布時間
-            expander_title = f"✨ 【{e_cat}】 {e_title}"
+            # 利用 JavaScript 抓取當前 expander 標題並在右側安插發布時間
+            time_span_html = f"<span class='expander-right-time'>發布時間: {e_created}</span>" if e_created else ""
+            expander_title = f"✨ 【{e_cat}】 {e_title} {time_span_html}"
 
             with st.expander(expander_title):
-                if e_created:
-                    st.markdown(
-                        f"<p style='text-align: right; font-size: 13px; color: gray; margin-bottom: 0;'>發布時間: {e_created}</p>",
-                        unsafe_allow_html=True
-                    )
-
                 col_einfo, col_ebtn1, col_ebtn2 = st.columns([6, 1.5, 1.5])
                 with col_einfo:
                     st.markdown(
